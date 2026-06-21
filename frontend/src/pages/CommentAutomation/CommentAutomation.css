@@ -1,0 +1,36 @@
+.campaigns-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:16px; }
+.camp-card { transition:var(--transition); }
+.camp-card.inactive { opacity:0.5; }
+.platform-mini-img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));
+}
+
+.platform-tiny-img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-img-icon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
+.btn-img-icon-sm {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+}
+.campaign-form { border-color:var(--accent); }
+.toggle-row { display:flex; align-items:center; justify-content:space-between; padding:12px 0; }

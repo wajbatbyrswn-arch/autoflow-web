@@ -1,33 +1,66 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import inboxRoutes from './routes/inbox';
-import kbRoutes from './routes/kb';
-import ordersRoutes from './routes/orders';
-import activationRoutes from './routes/activation';
-import adminRoutes from './routes/admin';
-import { startPollingJob } from './jobs/message-poller';
+import { verifyToken, getBearer } from './auth';
+import { registerAll, dispatch } from './rpc';
+import { addClient } from './events';
+import { startPoller } from './jobs/poller';
+
+import { dbHandlers } from './handlers/db';
+import { aiHandlers } from './handlers/ai';
+import { settingsHandlers } from './handlers/settings';
+import { accountHandlers } from './handlers/account';
+import { nashirHandlers } from './handlers/nashir';
+import { stubHandlers } from './handlers/stubs';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  credentials: true,
-}));
-app.use(express.json());
+app.use(cors({ origin: true, credentials: true }));
+app.use(express.json({ limit: '15mb' }));
 
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+// Register every channel (mirrors Electron IPC handlers).
+registerAll({
+  ...dbHandlers,
+  ...aiHandlers,
+  ...settingsHandlers,
+  ...accountHandlers,
+  ...nashirHandlers,
+  ...stubHandlers,
 });
 
-app.use('/api/inbox', inboxRoutes);
-app.use('/api/kb', kbRoutes);
-app.use('/api/orders', ordersRoutes);
-app.use('/api/activation', activationRoutes);
-app.use('/api/admin', adminRoutes);
+app.get('/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
+
+// Single RPC endpoint: { channel, payload } -> { result }
+app.post('/api/rpc', async (req, res) => {
+  const userId = await verifyToken(getBearer(req.headers.authorization) || '');
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+  const { channel, payload } = req.body || {};
+  try {
+    const result = await dispatch(channel, { userId }, payload);
+    return res.json({ result });
+  } catch (err: any) {
+    console.error(`[RPC ${channel}]`, err?.message || err);
+    return res.status(400).json({ error: err?.message || 'error' });
+  }
+});
+
+// SSE event stream (token passed as query param since EventSource can't set headers).
+app.get('/api/events', async (req, res) => {
+  const userId = await verifyToken(String(req.query.token || ''));
+  if (!userId) return res.status(401).end();
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+  });
+  res.write('retry: 5000\n\n');
+  addClient(userId, res);
+  const ping = setInterval(() => { try { res.write(': ping\n\n'); } catch {} }, 25000);
+  res.on('close', () => clearInterval(ping));
+});
 
 app.listen(PORT, () => {
   console.log(`AutoFlow API running on port ${PORT}`);
-  startPollingJob();
+  startPoller();
 });

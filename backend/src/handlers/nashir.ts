@@ -1,0 +1,99 @@
+import axios from 'axios';
+import { supabase } from '../supabase';
+import { Ctx } from '../rpc';
+
+const NASHIR_BASE = process.env.NASHIR_BASE_URL || 'https://nashir.ai/api/v1';
+
+/** Resolve the Nashir API key for a user (their own, else owner fallback). */
+export async function nashirKey(userId: string): Promise<string | null> {
+  const { data } = await supabase.from('user_profiles').select('nashir_api_key').eq('user_id', userId).single();
+  return (data?.nashir_api_key && data.nashir_api_key.trim()) || process.env.NASHIR_API_KEY || null;
+}
+
+function client(key: string) {
+  return axios.create({ baseURL: NASHIR_BASE, headers: { Authorization: `Bearer ${key}` }, timeout: 20000 });
+}
+
+export const nashir = {
+  accounts: (key: string) => client(key).get('/accounts').then(r => r.data.data || []),
+  unreadMessages: (key: string, accountId?: string) =>
+    client(key).get('/messages', { params: { is_read: false, limit: 50, ...(accountId ? { account_id: accountId } : {}) } }).then(r => r.data.data || []),
+  unreadComments: (key: string, accountId?: string) =>
+    client(key).get('/comments', { params: { is_read: false, limit: 50, ...(accountId ? { account_id: accountId } : {}) } }).then(r => r.data.data || []),
+  replyMessage: (key: string, id: number | string, message: string, pageId?: string) =>
+    client(key).post(`/messages/${id}/reply`, { message, ...(pageId ? { pageId } : {}) }).then(r => r.data),
+  replyComment: (key: string, id: number | string, message: string, pageId?: string) =>
+    client(key).post(`/comments/${id}/reply`, { message, ...(pageId ? { pageId } : {}) }).then(r => r.data),
+  markRead: (key: string, id: number | string) => client(key).patch(`/messages/${id}/read`).then(r => r.data),
+  createPost: (key: string, body: any) => client(key).post('/posts', body).then(r => r.data),
+};
+
+async function statusFor(userId: string, platform: 'facebook' | 'instagram') {
+  const key = await nashirKey(userId);
+  if (!key) return { connected: false, accounts: [] };
+  try {
+    const all = await nashir.accounts(key);
+    const accounts = all.filter((a: any) => platform === 'instagram' ? a.platform === 'instagram' : a.platform === 'facebook');
+    return { connected: accounts.length > 0, accounts };
+  } catch {
+    return { connected: false, accounts: [] };
+  }
+}
+
+export const nashirHandlers = {
+  // Facebook / Instagram status come from Nashir's connected accounts.
+  'facebook:getStatus': async ({ userId }: Ctx) => statusFor(userId, 'facebook'),
+  'instagram:getStatus': async ({ userId }: Ctx) => statusFor(userId, 'instagram'),
+
+  // Reply to a comment by Nashir comment id.
+  'facebook:replyComment': async ({ userId }: Ctx, { commentId, message }: any) => {
+    const key = await nashirKey(userId);
+    if (!key) return { success: false, error: 'Nashir not connected' };
+    await nashir.replyComment(key, commentId, message);
+    return { success: true };
+  },
+  'instagram:replyComment': async ({ userId }: Ctx, { commentId, message }: any) => {
+    const key = await nashirKey(userId);
+    if (!key) return { success: false, error: 'Nashir not connected' };
+    await nashir.replyComment(key, commentId, message);
+    return { success: true };
+  },
+
+  // Direct sends require a Nashir message id; the inbox reply flow uses inbox:reply.
+  'facebook:sendMessage': async () => ({ success: false, error: 'use inbox reply' }),
+  'instagram:sendMessage': async () => ({ success: false, error: 'use inbox reply' }),
+  'facebook:getComments': async () => [],
+  'instagram:getComments': async () => [],
+
+  // Connect flow: in the Nashir model the user links accounts on nashir.ai.
+  'oauth:facebook': async () => ({ success: false, error: 'اربط حساباتك من لوحة ناشر ثم أدخل مفتاح API في الإعدادات' }),
+  'facebook:getPages': async () => [],
+  'facebook:connect': async () => ({ success: false, error: 'use Nashir' }),
+  'facebook:connectWithPage': async () => ({ success: false, error: 'use Nashir' }),
+  'instagram:connect': async () => ({ success: false, error: 'use Nashir' }),
+  'instagram:getFromPage': async () => [],
+  'instagram:connectFromPage': async () => ({ success: false, error: 'use Nashir' }),
+
+  // Inbox reply: reply to the latest customer message in a conversation via Nashir.
+  'inbox:reply': async ({ userId }: Ctx, { conversation_id, message }: any) => {
+    const key = await nashirKey(userId);
+    if (!key) return { success: false, error: 'Nashir not connected' };
+    const { data: conv } = await supabase.from('conversations').select('*').eq('id', conversation_id).eq('user_id', userId).single();
+    if (!conv) return { success: false, error: 'conversation not found' };
+    const { data: lastCust } = await supabase.from('messages')
+      .select('nashir_message_id').eq('conversation_id', conversation_id).eq('sender', 'customer')
+      .order('created_at', { ascending: false }).limit(1).single();
+    const nid = lastCust?.nashir_message_id;
+    if (!nid) return { success: false, error: 'no message id' };
+
+    const isComment = String(conv.platform).includes('comment');
+    if (isComment) await nashir.replyComment(key, nid, message, conv.nashir_account_id);
+    else await nashir.replyMessage(key, nid, message, conv.nashir_account_id);
+
+    await supabase.from('messages').insert({
+      user_id: userId, conversation_id, sender: 'agent', content: message, message_type: 'text',
+    });
+    await supabase.from('conversations').update({ last_message: message, last_message_at: new Date().toISOString() }).eq('id', conversation_id);
+    return { success: true };
+  },
+};

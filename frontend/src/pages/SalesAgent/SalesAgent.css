@@ -1,0 +1,102 @@
+.wa-status-row { display:flex; align-items:center; justify-content:space-between; padding:12px 0; border-bottom:1px solid var(--border); }
+.wa-info { display:flex; flex-direction:column; gap:8px; }
+.wa-info p { font-size:13px; color:var(--text-secondary); }
+.qr-panel { display:flex; flex-direction:column; align-items:center; gap:16px; justify-content:center; min-height:300px; }
+.qr-image { width:220px; height:220px; border-radius:var(--radius-lg); border:3px solid var(--accent); padding:8px; background:#fff; }
+.product-form { border-color:var(--accent); }
+
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-img-icon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+
+.btn-img-icon-sm {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
+.tab {
+  padding: 10px 20px;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 500;
+  transition: var(--transition);
+}
+
+.tab:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
+.tab.active {
+  background: var(--accent-glow);
+  color: var(--accent);
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.1);
+}
+
+.tab-img-icon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  transition: var(--transition);
+}
+
+.tab.active .tab-img-icon {
+  transform: scale(1.15) rotate(5deg);
+  filter: drop-shadow(0 0 5px var(--accent));
+}
+
+/* ── Product image picker ─────────────────────────────────────────────────── */
+.product-image-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.product-thumb {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  border: 2px solid var(--border-color);
+  background: var(--bg-input);
+}
+
+/* Thumbnail in table */
+.product-table-thumb {
+  width: 42px;
+  height: 42px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background: var(--bg-input);
+  display: block;
+}
+
+.no-img {
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: var(--text-muted);
+  background: var(--bg-input);
+}
+

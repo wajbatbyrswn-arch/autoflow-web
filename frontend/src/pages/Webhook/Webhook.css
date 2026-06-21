@@ -1,0 +1,138 @@
+.webhook-page {
+  padding: 24px;
+  animation: fadeIn 0.3s ease;
+}
+
+.webhook-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.webhook-card {
+  background: var(--card-bg, rgba(255,255,255,0.03));
+  border: 1px solid var(--border-color, rgba(255,255,255,0.05));
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.webhook-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-color, rgba(255,255,255,0.05));
+  padding-bottom: 12px;
+  margin-bottom: 8px;
+}
+
+.webhook-card-title {
+  font-size: 16px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.webhook-status {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status-online { background: rgba(52, 211, 153, 0.1); color: #34d399; }
+.status-offline { background: rgba(248, 113, 113, 0.1); color: #f87171; }
+.status-connecting { background: rgba(251, 191, 36, 0.1); color: #fbbf24; }
+
+.webhook-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.webhook-label {
+  font-size: 13px;
+  color: var(--text-muted, #94a3b8);
+}
+
+.webhook-input {
+  background: rgba(0,0,0,0.2);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: white;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  font-family: monospace;
+}
+
+.webhook-input:focus {
+  border-color: #8b5cf6;
+}
+
+.webhook-btn {
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: 0.2s;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+}
+
+.webhook-btn-primary {
+  background: #8b5cf6;
+  color: white;
+}
+.webhook-btn-primary:hover {
+  background: #7c3aed;
+}
+
+.webhook-btn-danger {
+  background: #ef4444;
+  color: white;
+}
+.webhook-btn-danger:hover {
+  background: #dc2626;
+}
+
+.webhook-logs-card {
+  grid-column: span 2;
+  background: #0f172a;
+}
+
+.webhook-log-box {
+  background: #020617;
+  border: 1px solid #1e293b;
+  border-radius: 8px;
+  height: 300px;
+  overflow-y: auto;
+  padding: 12px;
+  font-family: monospace;
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.log-entry {
+  padding: 6px;
+  border-bottom: 1px solid #1e293b;
+  word-break: break-all;
+}
+
+.log-time {
+  color: #64748b;
+  margin-right: 8px;
+}
+
+.log-error { color: #f87171; }
+.log-info { color: #38bdf8; }
+.log-success { color: #34d399; }
