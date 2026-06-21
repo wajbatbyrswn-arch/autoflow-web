@@ -18,8 +18,43 @@ const TABS = [
   { id: 3, label: 'النظام', icon: monitorIcon },
 ]
 
+// Platform cards for the Nashir-based connection grid.
+const PLATFORM_CARDS = [
+  { key: 'whatsapp',  label: 'واتساب',     sub: 'WhatsApp Business', icon: whatsappIcon,  viaNashir: true },
+  { key: 'instagram', label: 'إنستغرام',   sub: 'Instagram',         icon: instagramIcon, viaNashir: true },
+  { key: 'facebook',  label: 'فيسبوك',     sub: 'Facebook Page',     icon: facebookIcon,  viaNashir: true },
+  { key: 'telegram',  label: 'تلغرام',     sub: 'Telegram',          icon: telegramIcon,  viaNashir: true },
+]
+
 export default function Settings() {
   const [tab, setTab] = useState(0)
+
+  // ── Nashir platform connections ──────────────────────────────────────────
+  const [nashirState, setNashirState] = useState(null)
+  const [nashirKeyInput, setNashirKeyInput] = useState('')
+  const [nashirSaving, setNashirSaving] = useState(false)
+  const [nashirLoading, setNashirLoading] = useState(false)
+
+  const loadNashir = useCallback(async () => {
+    setNashirLoading(true)
+    try {
+      const st = await window.api?.nashir?.status()
+      setNashirState(st)
+    } catch (e) { toast.error('تعذّر جلب حالة ناشر') }
+    setNashirLoading(false)
+  }, [])
+
+  async function saveNashirKey() {
+    setNashirSaving(true)
+    try {
+      const res = await window.api?.nashir?.saveKey(nashirKeyInput.trim())
+      if (res?.success) { toast.success('تم حفظ المفتاح والتحقق منه ✓'); setNashirKeyInput(''); await loadNashir() }
+      else toast.error(res?.error || 'فشل الحفظ')
+    } catch (e) { toast.error(e.message) }
+    setNashirSaving(false)
+  }
+
+  useEffect(() => { loadNashir() }, [loadNashir])
 
   // ── Meta Accounts (multi-account) ────────────────────────────────────────
   const [metaAccounts, setMetaAccounts] = useState([])
@@ -354,274 +389,92 @@ export default function Settings() {
 
       <div className="settings-content">
 
-        {/* ── Tab 0: Platforms ── */}
+        {/* ── Tab 0: Platforms (via Nashir) ── */}
         {tab === 0 && (
-          <div className="animate-fade settings-grid">
+          <div className="animate-fade">
 
-            {/* WhatsApp */}
-            <div className="card platform-settings-card">
-              <div className="platform-settings-header">
-                <div className="flex items-center gap-3">
-                  <img src={whatsappIcon} className="platform-settings-img" />
-                  <div>
-                    <div style={{fontWeight:700,fontSize:15}}>واتساب</div>
-                    <div style={{fontSize:12,color:'var(--text-muted)'}}>WhatsApp Baileys</div>
-                  </div>
+            {/* Nashir API key */}
+            <div className="card" style={{marginBottom:20}}>
+              <div className="card-title">ربط منصة ناشر</div>
+              <p style={{fontSize:13,color:'var(--text-muted)',marginBottom:14}}>
+                AutoFlow يربط حساباتك الاجتماعية عبر منصة <b>ناشر</b>. أدخل مفتاح API الخاص بك (يبدأ بـ up_) من
+                {' '}<a href="#" style={{color:'var(--accent,#6C47FF)'}} onClick={e=>{e.preventDefault();window.open('https://nashir.ai/dashboard/settings','_blank','noopener')}}>إعدادات ناشر → API Keys</a>.
+              </p>
+              <div style={{display:'flex',gap:8,alignItems:'flex-end'}}>
+                <div className="input-group" style={{flex:1,marginBottom:0}}>
+                  <label className="input-label">Nashir API Key</label>
+                  <input type="password" className="input" value={nashirKeyInput} onChange={e=>setNashirKeyInput(e.target.value)} placeholder="up_..." />
                 </div>
-                <span className={`badge ${waStatus==='connected'?'badge-success badge-dot':waStatus==='qr'?'badge-warning badge-dot':'badge-danger badge-dot'}`}>
-                  {waStatus==='connected'?'متصل':waStatus==='qr'?'انتظر QR':'منقطع'}
-                </span>
-              </div>
-              <div className="divider" />
-              {waQrCode ? (
-                <div className="qr-box animate-fade">
-                  <img src={waQrCode} alt="QR Code" style={{width:180,height:180,margin:'10px auto',display:'block',borderRadius:8}} />
-                  <p style={{fontSize:11,textAlign:'center',color:'var(--text-muted)'}}>امسح الرمز لربط الحساب</p>
-                </div>
-              ) : (
-                <div className="wa-actions">
-                  {waStatus !== 'connected' ? (
-                    <button className="btn btn-success btn-sm w-full" onClick={connectWA} disabled={waConnecting}>
-                      {waConnecting ? 'جارٍ الاتصال...' : 'اتصال بواتساب'}
-                    </button>
-                  ) : (
-                    <button className="btn btn-danger btn-sm w-full" onClick={disconnectWA}>قطع الاتصال</button>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Telegram */}
-            <div className="card platform-settings-card">
-              <div className="platform-settings-header">
-                <div className="flex items-center gap-3">
-                  <img src={telegramIcon} className="platform-settings-img" />
-                  <div>
-                    <div style={{fontWeight:700,fontSize:15}}>تلغرام</div>
-                    <div style={{fontSize:12,color:'var(--text-muted)'}}>Telegram Bot API</div>
-                  </div>
-                </div>
-                <span className={`badge ${tgStatus==='connected'?'badge-success badge-dot':'badge-danger badge-dot'}`}>
-                  {tgStatus==='connected'?'متصل':'منقطع'}
-                </span>
-              </div>
-              <div className="divider" />
-              <div className="input-group">
-                <label className="input-label">Bot Token</label>
-                <input type="password" className="input" value={tgToken} onChange={e=>setTgToken(e.target.value)} placeholder="12345:ABCDE..." />
-              </div>
-              <button className="btn btn-primary btn-sm" onClick={connectTG} disabled={tgConnecting}>
-                {tgConnecting ? 'جارٍ الاتصال...' : 'اتصال بتلغرام'}
-              </button>
-            </div>
-
-            {/* ── Meta: Facebook + Instagram (Multi-account) ── */}
-            <div className="card platform-settings-card" style={{gridColumn:'span 2'}}>
-              <div className="platform-settings-header">
-                <div className="flex items-center gap-3">
-                  <img src={facebookIcon} className="platform-settings-img" />
-                  <div>
-                    <div style={{fontWeight:700,fontSize:15}}>فيسبوك + إنستغرام</div>
-                    <div style={{fontSize:12,color:'var(--text-muted)'}}>Meta Graph API — يدعم حسابات متعددة</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={`badge ${hasFBAccounts?'badge-success badge-dot':'badge-danger badge-dot'}`}>
-                    {hasFBAccounts ? `${metaAccounts.length} حساب` : 'غير مربوط'}
-                  </span>
-                  {hasIGAccounts && (
-                    <span className="badge badge-success badge-dot">إنستغرام متصل</span>
-                  )}
-                </div>
-              </div>
-              <div className="divider" />
-
-              {/* ── Existing accounts list ── */}
-              {metaAccounts.length > 0 && (
-                <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:14}}>
-                  {metaAccounts.map(acc => (
-                    <div key={acc.page_id} style={{
-                      display:'flex',alignItems:'center',justifyContent:'space-between',
-                      padding:'10px 14px',borderRadius:10,
-                      background:'rgba(24,119,242,0.06)',
-                      border:'1px solid rgba(24,119,242,0.15)',
-                    }}>
-                      <div style={{display:'flex',alignItems:'center',gap:10}}>
-                        <img src={facebookIcon} style={{width:20,height:20}} />
-                        <div>
-                          <div style={{fontWeight:600,fontSize:13}}>{acc.page_name}</div>
-                          {acc.ig_username && (
-                            <div style={{display:'flex',alignItems:'center',gap:4,marginTop:2}}>
-                              <img src={instagramIcon} style={{width:12,height:12}} />
-                              <span style={{fontSize:11,color:'var(--text-muted)'}}>@{acc.ig_username}</span>
-                            </div>
-                          )}
-                          {!acc.ig_username && (
-                            <div style={{fontSize:11,color:'var(--text-muted)',marginTop:2}}>بدون إنستغرام مرتبط</div>
-                          )}
-                        </div>
-                        <span style={{fontSize:11,color:'#34d399',marginRight:4}}>✓ متصل</span>
-                      </div>
-                      <button
-                        className="btn btn-danger btn-sm"
-                        style={{padding:'3px 10px',fontSize:11}}
-                        onClick={() => removeAccount(acc.page_id, acc.page_name)}
-                      >
-                        إزالة
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* ── Add new account section ── */}
-              {!addingAccount ? (
-                <button
-                  className="btn btn-primary btn-sm"
-                  style={{width:'fit-content',display:'flex',alignItems:'center',gap:6}}
-                  onClick={() => setAddingAccount(true)}
-                >
-                  <span style={{fontSize:16,lineHeight:1}}>+</span>
-                  {metaAccounts.length === 0 ? 'ربط حساب فيسبوك / إنستغرام' : 'إضافة حساب آخر'}
+                <button className="btn btn-primary" onClick={saveNashirKey} disabled={nashirSaving}>
+                  {nashirSaving ? 'جارٍ الحفظ...' : 'حفظ وتحقق'}
                 </button>
-              ) : (
-                <div className="animate-fade" style={{
-                  border:'1px solid rgba(24,119,242,0.2)',borderRadius:12,padding:16,
-                  background:'rgba(24,119,242,0.04)',
-                }}>
-                  <div style={{fontWeight:700,fontSize:13,color:'#1877f2',marginBottom:12}}>
-                    إضافة حساب جديد
-                  </div>
-
-                  {/* Method toggle */}
-                  <div style={{display:'flex',gap:8,marginBottom:14,background:'var(--glass-bg)',padding:4,borderRadius:8,width:'fit-content'}}>
-                    <button
-                      className={`btn btn-sm ${fbMethod==='oauth'?'btn-primary':''}`}
-                      onClick={() => setFbMethod('oauth')}
-                      style={fbMethod!=='oauth'?{background:'transparent',color:'var(--text-muted)',border:'none'}:{}}
-                    >تسجيل دخول (تلقائي)</button>
-                    <button
-                      className={`btn btn-sm ${fbMethod==='manual'?'btn-primary':''}`}
-                      onClick={() => setFbMethod('manual')}
-                      style={fbMethod!=='manual'?{background:'transparent',color:'var(--text-muted)',border:'none'}:{}}
-                    >ربط يدوي (Token)</button>
-                  </div>
-
-                  {fbMethod === 'oauth' && fbOAuthStep === 'idle' && (
-                    <>
-                      {/* OAuth setup guide */}
-                      <div style={{background:'rgba(24,119,242,0.04)',border:'1px solid rgba(24,119,242,0.15)',borderRadius:8,padding:'12px 14px',marginBottom:12}}>
-                        <div style={{fontSize:12,color:'var(--text-secondary)',lineHeight:'1.8'}}>
-                          <div style={{display:'flex',alignItems:'flex-start',gap:8,marginBottom:6}}>
-                            <span style={{background:'#1877f2',color:'#fff',borderRadius:'50%',width:18,height:18,display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,flexShrink:0,marginTop:1}}>1</span>
-                            <span>
-                              تأكد من إضافة{' '}
-                              <code style={{background:'var(--bg-body)',padding:'1px 5px',borderRadius:4,fontSize:11}}>http://localhost:3000/oauth/callback</code>
-                              {' '}في{' '}
-                              <a href="#" style={{color:'#1877f2',cursor:'pointer'}}
-                                onClick={e=>{e.preventDefault();window.api?.shell?.openExternal('https://developers.facebook.com/apps/3522423384579759/fb-login/settings/')}}
-                              >إعدادات Facebook Login → Valid OAuth Redirect URIs</a>
-                            </span>
-                          </div>
-                          <div style={{display:'flex',alignItems:'flex-start',gap:8}}>
-                            <span style={{background:'#34d399',color:'#fff',borderRadius:'50%',width:18,height:18,display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,flexShrink:0,marginTop:1}}>✓</span>
-                            <span>ثم اضغط «تسجيل الدخول» — ستفتح نافذة مدمجة داخل التطبيق</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div style={{display:'flex',gap:8}}>
-                        <button
-                          className="btn btn-primary"
-                          style={{background:'linear-gradient(135deg,#1877f2,#0a5dc2)',display:'flex',alignItems:'center',gap:8,justifyContent:'center'}}
-                          onClick={startOAuth}
-                          disabled={fbConnecting}
-                        >
-                          <img src={facebookIcon} style={{width:18,height:18}} />
-                          {fbConnecting ? 'جارٍ تسجيل الدخول...' : 'تسجيل الدخول بفيسبوك'}
-                        </button>
-                        <button className="btn btn-sm" style={{background:'var(--glass-bg)',border:'1px solid var(--border-color)'}} onClick={cancelAdd}>
-                          إلغاء
-                        </button>
-                      </div>
-                    </>
-                  )}
-
-                  {fbMethod === 'oauth' && fbOAuthStep === 'pages' && (
-                    <div style={{display:'flex',flexDirection:'column',gap:10}}>
-                      <div className="input-group">
-                        <label className="input-label">اختر صفحتك على فيسبوك</label>
-                        <select
-                          className="input"
-                          value={fbSelectedPage?.id || ''}
-                          onChange={e => setFbSelectedPage(fbPages.find(p => p.id === e.target.value) || null)}
-                        >
-                          <option value="">-- اختر صفحة --</option>
-                          {fbPages.map(p => (
-                            <option key={p.id} value={p.id}>
-                              {p.name}
-                              {p.instagram_business_account ? ` + @${p.instagram_business_account.username}` : ''}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div style={{fontSize:11,color:'var(--text-muted)'}}>
-                        الصفحات التي تحتوي على علامة + تملك حساب إنستغرام Business وستربط تلقائياً
-                      </div>
-                      <div style={{display:'flex',gap:8}}>
-                        <button
-                          className="btn btn-primary"
-                          onClick={connectPage}
-                          disabled={fbConnecting || !fbSelectedPage}
-                          style={{flex:1}}
-                        >
-                          {fbConnecting ? 'جارٍ الاتصال...' : 'ربط الصفحة المختارة'}
-                        </button>
-                        <button
-                          className="btn btn-sm"
-                          style={{background:'var(--glass-bg)',border:'1px solid var(--border-color)'}}
-                          onClick={() => { setFbOAuthStep('idle'); setFbPages([]); setFbSelectedPage(null) }}
-                        >رجوع</button>
-                      </div>
-                    </div>
-                  )}
-
-                  {fbMethod === 'oauth' && fbOAuthStep === 'connecting' && (
-                    <div style={{textAlign:'center',padding:'20px 0',color:'var(--text-muted)',fontSize:13}}>
-                      جارٍ ربط الصفحة...
-                    </div>
-                  )}
-
-                  {fbMethod === 'manual' && (
-                    <div style={{display:'flex',flexDirection:'column',gap:10}}>
-                      <div className="input-group">
-                        <label className="input-label">رمز وصول الصفحة (Page Access Token)</label>
-                        <input className="input" value={manualFbToken} onChange={e=>setManualFbToken(e.target.value)} placeholder="EAA..." />
-                      </div>
-                      <div className="input-group">
-                        <label className="input-label">معرف الصفحة (Page ID)</label>
-                        <input className="input" value={manualFbPageId} onChange={e=>setManualFbPageId(e.target.value)} placeholder="123456789..." />
-                      </div>
-                      <div style={{display:'flex',gap:8}}>
-                        <button className="btn btn-primary" onClick={connectManual} disabled={fbConnecting} style={{flex:1}}>
-                          {fbConnecting ? 'جارٍ الاتصال...' : 'ربط الحساب يدوياً'}
-                        </button>
-                        <button className="btn btn-sm" style={{background:'var(--glass-bg)',border:'1px solid var(--border-color)'}} onClick={cancelAdd}>
-                          إلغاء
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
+              </div>
+              {nashirState?.usingOwnerKey && (
+                <div style={{marginTop:10,fontSize:12,color:'var(--text-muted)'}}>تستخدم حالياً المفتاح الافتراضي للنظام. أدخل مفتاحك الخاص لفصل حساباتك.</div>
               )}
-
-              {/* No accounts warning */}
-              {metaAccounts.length === 0 && !addingAccount && (
-                <div style={{marginTop:10,fontSize:12,color:'var(--text-muted)',padding:'8px 12px',background:'rgba(255,100,100,0.06)',borderRadius:8,border:'1px dashed rgba(255,100,100,0.25)'}}>
-                  لم يتم ربط أي حسابات فيسبوك أو إنستغرام بعد. اضغط الزر أعلاه لإضافة حسابك الأول.
-                </div>
+              {nashirState?.error && (
+                <div style={{marginTop:10,fontSize:12,color:'#ff6b6b'}}>{nashirState.error}</div>
               )}
             </div>
 
+            {/* Connected platforms grid */}
+            <div className="card">
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
+                <div className="card-title" style={{marginBottom:0}}>الحسابات المربوطة</div>
+                <button className="btn btn-sm" style={{background:'var(--glass-bg)',border:'1px solid var(--border-color)'}} onClick={loadNashir} disabled={nashirLoading}>
+                  {nashirLoading ? 'تحديث...' : '↻ تحديث'}
+                </button>
+              </div>
+              <p style={{fontSize:13,color:'var(--text-muted)',marginBottom:18}}>اربط حساباتك الاجتماعية عبر ناشر لاستقبال الرسائل والرد الذكي.</p>
+
+              <div className="settings-grid">
+                {PLATFORM_CARDS.map(pc => {
+                  const accounts = nashirState?.platforms?.[pc.key] || []
+                  const connected = accounts.length > 0
+                  return (
+                    <div key={pc.key} className="card platform-settings-card" style={{boxShadow:'none',border:'1px solid var(--border-color)'}}>
+                      <div className="platform-settings-header">
+                        <div className="flex items-center gap-3">
+                          <img src={pc.icon} className="platform-settings-img" />
+                          <div>
+                            <div style={{fontWeight:700,fontSize:15}}>{pc.label}</div>
+                            <div style={{fontSize:12,color:'var(--text-muted)'}}>{pc.sub}</div>
+                          </div>
+                        </div>
+                        <span className={`badge ${connected?'badge-success badge-dot':'badge-danger badge-dot'}`}>
+                          {connected ? 'مربوط' : 'غير مربوط'}
+                        </span>
+                      </div>
+                      <div className="divider" />
+                      {pc.viaNashir ? (
+                        <>
+                          {connected ? (
+                            <div style={{display:'flex',flexDirection:'column',gap:6,marginBottom:12}}>
+                              {accounts.map(a => (
+                                <div key={a.id} style={{fontSize:13,display:'flex',alignItems:'center',gap:6}}>
+                                  <span style={{color:'#34d399'}}>✓</span>
+                                  <span>{a.pageName || a.page_name || a.username || '—'}</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div style={{fontSize:12,color:'var(--text-muted)',marginBottom:12}}>لا يوجد حساب مربوط بعد.</div>
+                          )}
+                          <button className="btn btn-primary btn-sm w-full"
+                            onClick={()=>window.open((nashirState?.dashboardUrl||'https://nashir.ai/dashboard'),'_blank','noopener')}>
+                            {connected ? 'إدارة عبر ناشر' : `ربط ${pc.label} عبر ناشر`}
+                          </button>
+                        </>
+                      ) : (
+                        <div style={{fontSize:12,color:'var(--text-muted)'}}>
+                          {pc.soon}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
           </div>
         )}
 

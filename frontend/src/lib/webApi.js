@@ -72,6 +72,12 @@ export function installWebApi() {
       removeAccount: (pageId) => rpc('meta:removeAccount', pageId),
     },
 
+    // Nashir platform connection (Settings → Platforms)
+    nashir: {
+      status: () => rpc('nashir:status'),
+      saveKey: (apiKey) => rpc('nashir:saveKey', { apiKey }),
+    },
+
     telegram: {
       connect: (config) => rpc('telegram:connect', config),
       disconnect: () => rpc('telegram:disconnect'),

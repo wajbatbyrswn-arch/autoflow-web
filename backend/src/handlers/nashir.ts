@@ -40,7 +40,51 @@ async function statusFor(userId: string, platform: 'facebook' | 'instagram') {
   }
 }
 
+const NASHIR_DASHBOARD = 'https://nashir.ai/dashboard';
+
 export const nashirHandlers = {
+  // ---- Connection management UI (Settings → Platforms) ----
+  // Returns the Nashir connection state + connected accounts grouped by platform.
+  'nashir:status': async ({ userId }: Ctx) => {
+    const { data } = await supabase.from('user_profiles').select('nashir_api_key').eq('user_id', userId).single();
+    const ownKey = (data?.nashir_api_key || '').trim();
+    const key = ownKey || process.env.NASHIR_API_KEY || '';
+    const result: any = {
+      hasKey: !!ownKey,
+      usingOwnerKey: !ownKey && !!process.env.NASHIR_API_KEY,
+      dashboardUrl: NASHIR_DASHBOARD,
+      platforms: { whatsapp: [], instagram: [], facebook: [], telegram: [] },
+      error: null,
+    };
+    if (!key) return result;
+    try {
+      const accounts = await nashir.accounts(key);
+      for (const a of accounts) {
+        const p = String(a.platform || '').toLowerCase();
+        if (result.platforms[p]) result.platforms[p].push(a);
+      }
+    } catch (e: any) {
+      result.error = e?.response?.status === 401 ? 'مفتاح API غير صحيح' : (e?.message || 'تعذّر الاتصال بناشر');
+    }
+    return result;
+  },
+
+  'nashir:saveKey': async ({ userId }: Ctx, { apiKey }: any) => {
+    const key = String(apiKey || '').trim();
+    if (!key) {
+      await supabase.from('user_profiles').update({ nashir_api_key: '' }).eq('user_id', userId);
+      return { success: true, cleared: true };
+    }
+    // Validate by listing accounts.
+    try {
+      await nashir.accounts(key);
+    } catch (e: any) {
+      return { success: false, error: e?.response?.status === 401 ? 'مفتاح غير صحيح' : 'فشل التحقق من المفتاح' };
+    }
+    await supabase.from('user_profiles').update({ nashir_api_key: key }).eq('user_id', userId);
+    return { success: true };
+  },
+
   // Facebook / Instagram status come from Nashir's connected accounts.
   'facebook:getStatus': async ({ userId }: Ctx) => statusFor(userId, 'facebook'),
   'instagram:getStatus': async ({ userId }: Ctx) => statusFor(userId, 'instagram'),
