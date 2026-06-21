@@ -67,9 +67,18 @@ async function pollUser(user: any) {
   const key = await nashirKey(user.user_id);
   if (!key) return;
   const autoReply = (await getAutoReply(user.user_id));
+
+  // Owner-managed separation: only poll the Nashir page IDs assigned to this user.
+  // If none assigned (single-tenant / test), poll the whole team unscoped.
+  let accountIds: (string | undefined)[] = [undefined];
+  const raw = user.nashir_account_ids;
+  if (Array.isArray(raw) && raw.length) accountIds = raw.map((x: any) => String(x));
+
   try {
-    for (const m of await nashir.unreadMessages(key)) await handleItem(user.user_id, m, false, autoReply, key).catch(console.error);
-    for (const c of await nashir.unreadComments(key)) await handleItem(user.user_id, c, true, autoReply, key).catch(console.error);
+    for (const acc of accountIds) {
+      for (const m of await nashir.unreadMessages(key, acc)) await handleItem(user.user_id, m, false, autoReply, key).catch(console.error);
+      for (const c of await nashir.unreadComments(key, acc)) await handleItem(user.user_id, c, true, autoReply, key).catch(console.error);
+    }
   } catch (e: any) {
     console.error(`[poller user ${user.user_id}]`, e?.message || e);
   }
@@ -82,7 +91,7 @@ async function getAutoReply(userId: string): Promise<boolean> {
 
 export function startPoller() {
   cron.schedule('*/2 * * * *', async () => {
-    const { data: users } = await supabase.from('user_profiles').select('user_id').eq('subscription_status', 'active');
+    const { data: users } = await supabase.from('user_profiles').select('user_id, nashir_account_ids').eq('subscription_status', 'active');
     for (const u of users || []) await pollUser(u).catch(console.error);
   });
   console.log('Nashir poller started (every 2 min)');

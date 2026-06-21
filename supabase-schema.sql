@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS user_profiles (
   full_name TEXT DEFAULT '',
   nashir_api_key TEXT DEFAULT '',
   nashir_business_id TEXT DEFAULT '',
+  nashir_account_ids JSONB DEFAULT '[]'::jsonb,
   ai_model TEXT DEFAULT 'gemini-2.5-flash-lite',
   plan TEXT DEFAULT 'basic',
   subscription_status TEXT DEFAULT 'inactive',

@@ -15,11 +15,13 @@ export default function Admin() {
   const [count, setCount] = useState(1)
   const [days, setDays] = useState(30)
   const [loading, setLoading] = useState(false)
+  const [nashirAccounts, setNashirAccounts] = useState([])
 
   async function load() {
     try {
       setCodes(await rpc('admin:getCodes'))
       setUsers(await rpc('admin:getUsers'))
+      setNashirAccounts(await rpc('admin:nashirAccounts').catch(() => []))
     } catch (e) { toast.error(e.message) }
   }
   useEffect(() => { load() }, [])
@@ -72,7 +74,7 @@ export default function Admin() {
         <h2 style={h2}>المستخدمون ({users.length})</h2>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
           <thead><tr style={{ textAlign: 'right', opacity: .7 }}>
-            <th style={th}>المتجر</th><th style={th}>الحالة</th><th style={th}>الموديل</th><th style={th}>الاشتراك</th>
+            <th style={th}>المتجر</th><th style={th}>الحالة</th><th style={th}>الموديل</th><th style={th}>الاشتراك</th><th style={th}>صفحات ناشر (الفصل)</th>
           </tr></thead>
           <tbody>
             {users.map(u => (
@@ -88,6 +90,18 @@ export default function Admin() {
                   <select value={u.subscription_status} onChange={e => updateUser(u.user_id, { subscription_status: e.target.value })} style={sel}>
                     <option value="active">نشط</option><option value="inactive">غير نشط</option><option value="expired">منتهي</option>
                   </select>
+                </td>
+                <td style={td}>
+                  <select multiple value={(u.nashir_account_ids || []).map(String)} style={{ ...sel, minWidth: 180, minHeight: 64 }}
+                    onChange={e => {
+                      const ids = Array.from(e.target.selectedOptions).map(o => o.value)
+                      updateUser(u.user_id, { nashir_account_ids: ids })
+                    }}>
+                    {nashirAccounts.map(a => (
+                      <option key={a.pageId} value={a.pageId}>{a.platform === 'instagram' ? '📸' : '📘'} {a.pageName}</option>
+                    ))}
+                  </select>
+                  <div style={{ fontSize: 10, opacity: .5, marginTop: 2 }}>اتركه فارغاً = كل الرسائل (تجربة)</div>
                 </td>
               </tr>
             ))}

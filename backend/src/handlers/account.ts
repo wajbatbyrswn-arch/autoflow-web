@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { supabase } from '../supabase';
 import { Ctx } from '../rpc';
+import { nashir } from './nashir';
 
 /** Ensure a profile + store_config row exists for the user (first login bootstrap). */
 async function ensureProfile(userId: string) {
@@ -71,14 +72,28 @@ export const accountHandlers = {
     const { data } = await supabase.from('user_profiles').select('*').order('created_at', { ascending: false });
     return data || [];
   },
-  'admin:updateUser': async ({ userId }: Ctx, { target_user_id, ai_model, subscription_status, is_admin }: any) => {
+  'admin:updateUser': async ({ userId }: Ctx, { target_user_id, ai_model, subscription_status, is_admin, nashir_account_ids, nashir_business_id }: any) => {
     await requireAdmin(userId);
     const updates: Record<string, unknown> = {};
     if (ai_model !== undefined) updates.ai_model = ai_model;
     if (subscription_status !== undefined) updates.subscription_status = subscription_status;
     if (is_admin !== undefined) updates.is_admin = is_admin;
+    if (nashir_account_ids !== undefined) {
+      updates.nashir_account_ids = Array.isArray(nashir_account_ids)
+        ? nashir_account_ids.map((x: any) => String(x).trim()).filter(Boolean)
+        : [];
+    }
+    if (nashir_business_id !== undefined) updates.nashir_business_id = String(nashir_business_id || '');
     const { data } = await supabase.from('user_profiles').update(updates).eq('user_id', target_user_id).select().single();
     return data;
+  },
+
+  // Owner's Nashir connected accounts — used in the admin panel to assign pages to a client.
+  'admin:nashirAccounts': async ({ userId }: Ctx) => {
+    await requireAdmin(userId);
+    const key = process.env.NASHIR_API_KEY || '';
+    if (!key) return [];
+    try { return await nashir.accounts(key); } catch { return []; }
   },
 
   // ---- Meta accounts (connected pages) ----
