@@ -17,11 +17,19 @@ export async function rpc(channel, payload) {
     'Content-Type': 'application/json',
     ...(await authHeader()),
   }
-  const res = await fetch(`${BACKEND_URL}/api/rpc`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ channel, payload }),
-  })
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), 20000)
+  let res
+  try {
+    res = await fetch(`${BACKEND_URL}/api/rpc`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ channel, payload }),
+      signal: ctrl.signal,
+    })
+  } finally {
+    clearTimeout(timer)
+  }
   if (!res.ok) {
     let msg = res.statusText
     try { msg = (await res.json()).error || msg } catch {}

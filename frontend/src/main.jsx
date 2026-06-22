@@ -33,9 +33,14 @@ function Gate() {
     return () => listener.subscription.unsubscribe()
   }, [])
 
-  function refreshStatus() {
+  function refreshStatus(retries = 4) {
     setSub(null); setSubError(false)
-    rpc('activation:status').then(setSub).catch(() => setSubError(true))
+    rpc('activation:status')
+      .then(setSub)
+      .catch(() => {
+        if (retries > 0) setTimeout(() => refreshStatus(retries - 1), 2500)
+        else setSubError(true)
+      })
   }
 
   useEffect(() => {
