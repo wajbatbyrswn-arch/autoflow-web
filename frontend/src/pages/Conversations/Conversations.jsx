@@ -100,14 +100,11 @@ export default function Conversations() {
 
     let res = null
     try {
-      if (selected.platform === 'whatsapp') {
-        res = await window.api?.whatsapp.sendMessage(selected.sender_id, msg)
-      } else if (selected.platform === 'facebook') {
-        res = await window.api?.facebook.sendMessage(selected.sender_id, msg)
-      } else if (selected.platform === 'instagram') {
-        res = await window.api?.instagram.sendMessage(selected.sender_id, msg)
-      } else if (selected.platform === 'telegram') {
+      if (selected.platform === 'telegram') {
         res = await window.api?.telegram?.sendMessage({ to: selected.sender_id, message: msg })
+      } else {
+        // facebook / instagram / whatsapp all go through Nashir's inbox reply.
+        res = await window.api?.inbox?.reply(selected.id, msg)
       }
 
       if (res?.success === false) {
@@ -242,14 +239,20 @@ export default function Conversations() {
                 <div className="empty-state" style={{height:'100%'}}>
                   <p style={{color:'var(--text-muted)', fontSize:13}}>لا توجد رسائل بعد</p>
                 </div>
-              ) : messages.map((m, i) => (
-                <div key={i} className={`msg-bubble ${m.sender === 'user' ? 'user' : 'assistant'}`}>
-                  <div className="msg-text">{m.content}</div>
-                  <div className="msg-time">
-                    {new Date(m.created_at).toLocaleTimeString('ar', {hour:'2-digit', minute:'2-digit'})}
+              ) : messages.map((m, i) => {
+                // customer = incoming (right). assistant = AI reply (left, green). agent = manual reply (left, blue).
+                const cls = m.sender === 'customer' ? 'incoming' : (m.sender === 'assistant' ? 'ai' : 'agent')
+                return (
+                  <div key={i} className={`msg-bubble ${cls}`}>
+                    {m.sender === 'assistant' && <span className="msg-tag">🤖 رد ذكي</span>}
+                    {m.sender === 'agent' && <span className="msg-tag">👤 ردّك</span>}
+                    <div className="msg-text">{m.content}</div>
+                    <div className="msg-time">
+                      {new Date(m.created_at).toLocaleTimeString('ar', {hour:'2-digit', minute:'2-digit'})}
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
               <div ref={bottomRef} />
             </div>
 

@@ -31,7 +31,8 @@ function normalize(raw: any) {
   return {
     // The id used to reply via Nashir REST is the internal nashir_message_id.
     replyId: raw.nashir_message_id ?? raw.id ?? raw.message_id,
-    dedupKey: String(raw.platform_message_id ?? raw.nashir_message_id ?? raw.id ?? `gen_${Date.now()}`),
+    // Store the numeric nashir_message_id so manual replies from the inbox can target it.
+    dedupKey: String(raw.nashir_message_id ?? raw.platform_message_id ?? raw.id ?? `gen_${Date.now()}`),
     base,
     isComment,
     // Conversation platform = base (facebook|instagram|whatsapp) so the inbox filter

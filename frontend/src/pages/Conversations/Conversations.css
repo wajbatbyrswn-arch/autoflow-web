@@ -223,6 +223,36 @@
 .msg-bubble.user    { align-self: flex-end;  align-items: flex-end; }
 .msg-bubble.assistant { align-self: flex-start; align-items: flex-start; }
 
+/* Inbox roles: customer = incoming (right). our replies (ai/agent) = left, distinct colors. */
+.msg-bubble.incoming { align-self: flex-end;   align-items: flex-end; }
+.msg-bubble.ai       { align-self: flex-start; align-items: flex-start; }
+.msg-bubble.agent    { align-self: flex-start; align-items: flex-start; }
+
+.msg-bubble.incoming .msg-text {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-bottom-right-radius: 4px;
+}
+.msg-bubble.ai .msg-text {
+  background: #10b981; /* green = AI */
+  color: #fff;
+  border-bottom-left-radius: 4px;
+}
+.msg-bubble.agent .msg-text {
+  background: #3b82f6; /* blue = your manual reply */
+  color: #fff;
+  border-bottom-left-radius: 4px;
+}
+.msg-tag {
+  font-size: 10px;
+  font-weight: 700;
+  opacity: 0.8;
+  padding: 0 4px;
+}
+.msg-bubble.ai .msg-tag    { color: #10b981; }
+.msg-bubble.agent .msg-tag { color: #3b82f6; }
+
 .msg-text {
   padding: 10px 14px;
   border-radius: 18px;

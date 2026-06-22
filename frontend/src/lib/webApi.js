@@ -78,6 +78,11 @@ export function installWebApi() {
       saveKey: (apiKey) => rpc('nashir:saveKey', { apiKey }),
     },
 
+    // Manual inbox reply (sends via Nashir to the conversation's last customer message)
+    inbox: {
+      reply: (conversation_id, message) => rpc('inbox:reply', { conversation_id, message }),
+    },
+
     telegram: {
       connect: (config) => rpc('telegram:connect', config),
       disconnect: () => rpc('telegram:disconnect'),
