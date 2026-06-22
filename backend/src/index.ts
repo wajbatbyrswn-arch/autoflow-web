@@ -70,5 +70,7 @@ process.on('uncaughtException', (err) => {
 
 app.listen(PORT, () => {
   console.log(`AutoFlow API running on port ${PORT}`);
-  startPoller();
+  // Poller is opt-in (set ENABLE_POLLER=1). Disabled by default — ingestion will
+  // move to the Nashir webhook, and the broad poll was exhausting the Gemini quota.
+  if (process.env.ENABLE_POLLER === '1') startPoller();
 });
