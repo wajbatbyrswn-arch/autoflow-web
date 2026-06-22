@@ -83,8 +83,10 @@ export async function processInbound(userId: string, raw: any): Promise<string> 
     const key = await nashirKey(userId);
     if (key) {
       try {
-        if (item.isComment) await nashir.replyComment(key, item.replyId, reply, item.pageId);
-        else await nashir.replyMessage(key, item.replyId, reply, item.pageId);
+        // Omit pageId — Nashir resolves the correct page from the message itself.
+        // (Passing the IG id makes Nashir look for a FB account with that id and fail.)
+        if (item.isComment) await nashir.replyComment(key, item.replyId, reply);
+        else await nashir.replyMessage(key, item.replyId, reply);
         await supabase.from('messages').insert({
           user_id: userId, conversation_id: conv!.id, sender: 'assistant', content: reply, message_type: 'text',
         });
