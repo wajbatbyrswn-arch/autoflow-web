@@ -30,9 +30,10 @@ function normalize(raw: any) {
   const isComment = mtype === 'comment';
   return {
     // The id used to reply via Nashir REST is the internal nashir_message_id.
+    // Numeric internal id used to reply via Nashir REST (kept separately for manual replies).
     replyId: raw.nashir_message_id ?? raw.id ?? raw.message_id,
-    // Store the numeric nashir_message_id so manual replies from the inbox can target it.
-    dedupKey: String(raw.nashir_message_id ?? raw.platform_message_id ?? raw.id ?? `gen_${Date.now()}`),
+    // Dedup on the platform message id (stable & unique per inbound message).
+    dedupKey: String(raw.platform_message_id ?? raw.nashir_message_id ?? raw.id ?? `gen_${Date.now()}`),
     base,
     isComment,
     // Conversation platform = base (facebook|instagram|whatsapp) so the inbox filter
@@ -76,6 +77,7 @@ export async function processInbound(userId: string, raw: any): Promise<string> 
   if (!exists) {
     await supabase.from('messages').insert({
       user_id: userId, conversation_id: conv!.id, nashir_message_id: item.dedupKey,
+      nashir_reply_id: item.replyId ? String(item.replyId) : null,
       sender: 'customer', content: item.content, message_type: item.isComment ? 'comment' : 'dm', ai_suggestion: reply,
     });
   }

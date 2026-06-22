@@ -133,15 +133,22 @@ export const nashirHandlers = {
     const { data: conv } = await supabase.from('conversations').select('*').eq('id', conversation_id).eq('user_id', userId).single();
     if (!conv) return { success: false, error: 'conversation not found' };
     const { data: lastCust } = await supabase.from('messages')
-      .select('nashir_message_id, message_type').eq('conversation_id', conversation_id).eq('sender', 'customer')
+      .select('nashir_message_id, nashir_reply_id, message_type').eq('conversation_id', conversation_id).eq('sender', 'customer')
       .order('created_at', { ascending: false }).limit(1).single();
-    const nid = lastCust?.nashir_message_id;
+    // Prefer the numeric reply id; fall back to the stored id for older rows.
+    const nid = lastCust?.nashir_reply_id || lastCust?.nashir_message_id;
     if (!nid) return { success: false, error: 'no message id' };
 
     // Omit pageId — Nashir resolves the page from the message itself.
     const isComment = lastCust?.message_type === 'comment';
-    if (isComment) await nashir.replyComment(key, nid, message);
-    else await nashir.replyMessage(key, nid, message);
+    try {
+      if (isComment) await nashir.replyComment(key, nid, message);
+      else await nashir.replyMessage(key, nid, message);
+    } catch (e: any) {
+      const detail = e?.response?.data?.error || e?.response?.data || e?.message || 'reply failed';
+      console.error('[inbox:reply] Nashir', e?.response?.status, JSON.stringify(detail));
+      return { success: false, error: `Nashir: ${typeof detail === 'string' ? detail : JSON.stringify(detail)}` };
+    }
 
     await supabase.from('messages').insert({
       user_id: userId, conversation_id, sender: 'agent', content: message, message_type: 'text',
