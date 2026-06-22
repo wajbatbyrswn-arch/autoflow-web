@@ -36,7 +36,7 @@ export default function App({ profile }) {
             <Routes>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/ai-config" element={<AIConfig />} />
+              {isAdmin && <Route path="/ai-config" element={<AIConfig />} />}
               <Route path="/sales-agent" element={<SalesAgent />} />
               <Route path="/comments" element={<CommentAutomation />} />
               <Route path="/conversations" element={<Conversations />} />

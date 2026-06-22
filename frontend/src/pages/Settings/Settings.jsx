@@ -9,6 +9,7 @@ import instagramIcon from '../../assets/icons/instagram.png'
 import telegramIcon from '../../assets/icons/telegram.png'
 import whatsappIcon from '../../assets/icons/whatsapp.png'
 import saveIcon from '../../assets/icons/save.png'
+import { CURRENCIES } from '../../lib/currencies'
 import './Settings.css'
 
 const TABS = [
@@ -488,8 +489,21 @@ export default function Settings() {
                   {storeLogo ? <img src={storeLogo} alt="Preview" /> : <div className="no-logo-msg"><p>لا يوجد شعار</p></div>}
                 </div>
                 <div className="input-group">
-                  <label className="input-label">رابط الشعار أو Base64</label>
-                  <input className="input" value={storeLogo} onChange={e=>setStoreLogo(e.target.value)} placeholder="data:image/png;base64,..." />
+                  <label className="input-label">شعار المتجر</label>
+                  <input type="file" accept="image/*" style={{ display: 'none' }} id="logo-file-input"
+                    onChange={e => {
+                      const f = e.target.files?.[0]; if (!f) return
+                      if (f.size > 2 * 1024 * 1024) { toast.error('الصورة كبيرة (الحد 2MB)'); return }
+                      const reader = new FileReader()
+                      reader.onload = () => setStoreLogo(reader.result)
+                      reader.readAsDataURL(f)
+                    }} />
+                  <div className="flex gap-2">
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => document.getElementById('logo-file-input').click()}>
+                      📷 اختر صورة من الجهاز
+                    </button>
+                    {storeLogo && <button type="button" className="btn btn-danger btn-sm" onClick={() => setStoreLogo('')}>✕ حذف</button>}
+                  </div>
                 </div>
               </div>
               <div className="info-edit-section">
@@ -500,9 +514,7 @@ export default function Settings() {
                 <div className="input-group">
                   <label className="input-label">العملة</label>
                   <select className="input" value={currency} onChange={e=>setCurrency(e.target.value)}>
-                    <option value="IQD">دينار عراقي (IQD)</option>
-                    <option value="USD">دولار أمريكي (USD)</option>
-                    <option value="AED">درهم إماراتي (AED)</option>
+                    {CURRENCIES.map(c => <option key={c.v} value={c.v}>{c.l}</option>)}
                   </select>
                 </div>
                 <button className="btn btn-primary flex-center" onClick={saveProfile} disabled={isSavingProfile}>

@@ -19,7 +19,6 @@ import globeIcon from '../../assets/icons/globe.png'
 const NAV_MAIN = [
   { to: '/dashboard', icon: dashboardIcon, label: 'لوحة التحكم', isImage: true },
   { to: '/conversations', icon: chatIcon, label: 'المحادثات', isImage: true },
-  { to: '/ai-config', icon: configIcon, label: 'الذكاء الاصطناعي', isImage: true },
 ]
 
 const NAV_TOOLS = [
@@ -97,6 +96,10 @@ export default function Sidebar({ isAdmin }) {
               <NavLink to="/admin" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
                 <Database size={18} className="nav-icon" />
                 <span className="nav-label">لوحة الإدارة</span>
+              </NavLink>
+              <NavLink to="/ai-config" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+                <img src={configIcon} alt="AI" className="nav-img-icon" />
+                <span className="nav-label">الذكاء الاصطناعي</span>
               </NavLink>
             </nav>
           </div>

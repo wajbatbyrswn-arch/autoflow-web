@@ -12,6 +12,7 @@ export const dbHandlers = {
       user_id: userId, sku: p.sku || '', name: p.name, description: p.description || '',
       price: p.price || 0, quantity: p.quantity || 0, sizes: p.sizes || '',
       image_url: p.image_url || '', category: p.category || '', notes: p.notes || '',
+      custom_fields: p.custom_fields || {},
       updated_at: new Date().toISOString(),
     };
     if (p.id) {
@@ -143,7 +144,9 @@ export const dbHandlers = {
       user_id: userId, store_name: c.store_name || '', store_description: c.store_description || '',
       language: c.language || 'ar', work_hours: c.work_hours || '', ai_personality: c.ai_personality || 'friendly',
       currency: c.currency || 'JOD', contact_phone: c.contact_phone || '', system_prompt: c.system_prompt || '',
-      store_logo: c.store_logo || '', updated_at: new Date().toISOString(),
+      store_logo: c.store_logo || '',
+      ...(c.product_fields !== undefined ? { product_fields: c.product_fields } : {}),
+      updated_at: new Date().toISOString(),
     }, { onConflict: 'user_id' });
     return { success: true };
   },

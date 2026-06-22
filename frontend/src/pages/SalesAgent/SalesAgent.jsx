@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
+import * as XLSX from 'xlsx'
+import { CURRENCIES } from '../../lib/currencies'
 import './SalesAgent.css'
 
 import storeIcon from '../../assets/icons/store.png'
@@ -17,43 +19,37 @@ const TABS = [
   { label: 'المنتجات', icon: packageIcon },
   { label: 'System Prompt', icon: agentIcon },
 ]
-const CURRENCIES = [
-  { v:'IQD', l:'د.ع - دينار عراقي' },
-  { v:'USD', l:'$ - دولار أمريكي' },
-  { v:'AED', l:'د.إ - درهم إماراتي' },
-  { v:'SAR', l:'ر.س - ريال سعودي' },
-  { v:'EGP', l:'ج.م - جنيه مصري' },
-  { v:'JOD', l:'د.أ - دينار أردني' },
-  { v:'KWD', l:'د.ك - دينار كويتي' },
-  { v:'BHD', l:'د.ب - دينار بحريني' },
-  { v:'OMR', l:'ر.ع - ريال عماني' },
-  { v:'QAR', l:'ر.ق - ريال قطري' },
-  { v:'LBP', l:'ل.ل - ليرة لبنانية' },
-  { v:'SYP', l:'ل.س - ليرة سورية' },
-  { v:'TRY', l:'₺ - ليرة تركية' },
-  { v:'EUR', l:'€ - يورو' },
-  { v:'GBP', l:'£ - جنيه إسترليني' },
-  { v:'CAD', l:'C$ - دولار كندي' },
-  { v:'AUD', l:'A$ - دولار أسترالي' },
-  { v:'CNY', l:'¥ - يوان صيني' },
-  { v:'INR', l:'₹ - روبية هندية' },
-  { v:'PKR', l:'₨ - روبية باكستانية' },
-]
 const PERSONALITIES = [{v:'friendly',l:'ودي ومرح'},{v:'formal',l:'رسمي واحترافي'},{v:'professional',l:'احترافي'}]
 const LANGUAGES = [{v:'ar',l:'عربي'},{v:'en',l:'English'},{v:'multi',l:'متعدد اللغات'}]
+
+// Built-in product fields (mapped to real columns). The owner can toggle these on/off.
+const BUILTIN_FIELDS = [
+  { key: 'sku', label: 'رقم المنتج (SKU)', type: 'text' },
+  { key: 'category', label: 'الفئة', type: 'text' },
+  { key: 'price', label: 'السعر', type: 'number' },
+  { key: 'quantity', label: 'الكمية', type: 'number' },
+  { key: 'sizes', label: 'المقاسات', type: 'text' },
+  { key: 'description', label: 'وصف المنتج', type: 'textarea' },
+]
+const DEFAULT_FIELD_CONFIG = { enabled: BUILTIN_FIELDS.map(f => f.key), custom: [] }
 
 export default function SalesAgent() {
   const [tab, setTab] = useState(0)
   const navigate = useNavigate()
-  const [store, setStore] = useState({ store_name:'', store_description:'', language:'ar', work_hours:'', ai_personality:'friendly', currency:'IQD', contact_phone:'', system_prompt:'' })
+  const [store, setStore] = useState({ store_name:'', store_description:'', language:'ar', work_hours:'', ai_personality:'friendly', currency:'JOD', contact_phone:'', system_prompt:'', product_fields:null })
   const [products, setProducts] = useState([])
   const [editing, setEditing] = useState(null)
+  const [fieldConfig, setFieldConfig] = useState(DEFAULT_FIELD_CONFIG)
+  const [showFieldManager, setShowFieldManager] = useState(false)
+  const imgInputRef = useRef(null)
+  const excelInputRef = useRef(null)
 
   useEffect(() => { loadAll() }, [])
 
   async function loadAll() {
     const cfg = await window.api?.db.getStoreConfig() || {}
     setStore(s => ({ ...s, ...cfg }))
+    if (cfg.product_fields && cfg.product_fields.enabled) setFieldConfig(cfg.product_fields)
     const prods = await window.api?.db.getProducts() || []
     setProducts(prods)
   }
@@ -63,13 +59,35 @@ export default function SalesAgent() {
     toast.success('تم حفظ إعدادات المتجر ✓')
   }
 
+  // ---- Field customization ----
+  const enabledBuiltins = BUILTIN_FIELDS.filter(f => fieldConfig.enabled.includes(f.key))
+  function toggleBuiltin(key) {
+    setFieldConfig(c => ({ ...c, enabled: c.enabled.includes(key) ? c.enabled.filter(k => k !== key) : [...c.enabled, key] }))
+  }
+  function addCustomField(label) {
+    const l = (label || '').trim(); if (!l) return
+    const key = 'cf_' + l.replace(/\s+/g, '_').toLowerCase()
+    if (fieldConfig.custom.some(c => c.key === key)) return toast.error('الحقل موجود')
+    setFieldConfig(c => ({ ...c, custom: [...c.custom, { key, label: l }] }))
+  }
+  function removeCustomField(key) {
+    setFieldConfig(c => ({ ...c, custom: c.custom.filter(f => f.key !== key) }))
+  }
+  async function saveFieldConfig() {
+    const next = { ...store, product_fields: fieldConfig }
+    setStore(next)
+    await window.api?.db.saveStoreConfig(next)
+    setShowFieldManager(false)
+    toast.success('تم حفظ تخصيص الحقول ✓')
+  }
+
   function buildPrompt() {
     const personality = PERSONALITIES.find(p => p.v === store.ai_personality)?.l || 'ودي'
     const currencyLabel = CURRENCIES.find(c => c.v === store.currency)?.l || store.currency
-    const productLines = products.map(p =>
-      `• ${p.name} | السعر: ${p.price} ${store.currency} | الكمية: ${p.quantity}${p.sizes ? ' | المقاسات: '+p.sizes : ''}${p.description ? ' | '+p.description : ''}`
-    ).join('\n')
-
+    const productLines = products.map(p => {
+      const extras = (fieldConfig.custom || []).map(cf => p.custom_fields?.[cf.key] ? `${cf.label}: ${p.custom_fields[cf.key]}` : '').filter(Boolean).join(' | ')
+      return `• ${p.name} | السعر: ${p.price} ${store.currency} | الكمية: ${p.quantity}${p.sizes ? ' | المقاسات: '+p.sizes : ''}${p.description ? ' | '+p.description : ''}${extras ? ' | '+extras : ''}`
+    }).join('\n')
     const categories = [...new Set(products.map(p => p.category).filter(Boolean))].join('، ')
     const categoriesText = categories ? `نبيع: ${categories}` : store.store_description || 'منتجات متنوعة'
 
@@ -83,68 +101,32 @@ ${categoriesText}
 === رسالة الترحيب (أرسلها عند أول رد) ===
 "أهلاً وسهلاً بك في ${store.store_name}! 🎉\n${categoriesText}\nكيف أستطيع مساعدتك اليوم؟ 😊"
 
-=== أسلوب التواصل ===
-• استخدم إيموجي مناسبة في كل رسالة ✅❤️🛒💫
-• كن مختصراً وواضحاً، لا تطول الردود
-• إذا سأل عن منتج، أعطه الصورة (إذا متوفرة) والوصف والسعر
-• إذا لم يجد ما يريد، اعتذر بلطف وعرض البدائل
-
 === قاعدة المنتجات ===
 ${productLines || '⚠️ لا توجد منتجات مضافة حالياً. اعتذر للزبون بلباقة.'}
 
-=== مراحل البيع (اتبعها بالترتيب) ===
+=== مراحل البيع ===
 1️⃣ الترحيب وفهم الطلب
-   • رحب، استفسر عن المطلوب، أجب على الأسئلة
-
-2️⃣ جمع بيانات التوصيل (خطوة بخطوة - لا تطلب كلها دفعة واحدة)
-   1. اسأل: "ما اسمك الكريم؟ 😊" (انتظر الإجابة)
-   2. اسأل: "وما رقم هاتفك؟ 📱" (انتظر)
-   3. اسأل: "وعنوانك التفصيلي (المدينة والمنطقة)؟ 📍" (انتظر)
-
-3️⃣ تأكيد الطلب
-   • اعرض ملخص الطلب كفاتورة واضحة 🧾
-   • "هل تؤكد طلبك؟ ✅"
-
-4️⃣ تسجيل الطلب
-   • شكّره واعطه وقت التوصيل المتوقع 🚚
-   • أرسل JSON داخل [ORDER_READY]...[/ORDER_READY]
+2️⃣ جمع بيانات التوصيل (الاسم، الهاتف، العنوان) خطوة بخطوة
+3️⃣ تأكيد الطلب كفاتورة واضحة 🧾
+4️⃣ تسجيل الطلب وإرسال JSON داخل [ORDER_READY]...[/ORDER_READY]
 
 === صيغة JSON ===
 [ORDER_READY]
-{
-  "customer_name": "الاسم الكامل",
-  "customer_phone": "رقم الهاتف",
-  "customer_city": "المدينة",
-  "customer_area": "المنطقة والتفاصيل",
-  "products": [{"name": "اسم المنتج", "quantity": 1, "price": 1000}],
-  "total_amount": 1000
-}
+{"customer_name":"","customer_phone":"","customer_city":"","customer_area":"","products":[{"name":"","quantity":1,"price":0}],"total_amount":0}
 [/ORDER_READY]`
     setStore(s => ({ ...s, system_prompt: prompt }))
     toast.success('تم بناء الـ System Prompt ✓')
   }
 
-  const emptyProduct = { sku:'', name:'', description:'', price:'', quantity:'', sizes:'', image_url:'', category:'', notes:'' }
+  const emptyProduct = { sku:'', name:'', description:'', price:'', quantity:'', sizes:'', image_url:'', category:'', notes:'', custom_fields:{} }
 
-  async function pickProductImage() {
-    try {
-      const res = await window.api?.dialog?.showOpenDialog({
-        title: 'اختر صورة المنتج',
-        filters: [{ name: 'الصور', extensions: ['jpg','jpeg','png','webp','gif'] }],
-        properties: ['openFile'],
-      })
-      if (res?.canceled || !res?.filePaths?.length) return
-      const filePath = res.filePaths[0]
-      // Read file as base64 via IPC
-      const base64 = await window.api?.fs?.readFileBase64(filePath)
-      if (base64) {
-        const ext = filePath.split('.').pop().toLowerCase()
-        setEditing(p => ({ ...p, image_url: `data:image/${ext};base64,${base64}` }))
-        toast.success('تم تحميل الصورة ✓')
-      }
-    } catch (e) {
-      toast.error('فشل تحميل الصورة')
-    }
+  function onPickImage(e) {
+    const f = e.target.files?.[0]; e.target.value = ''
+    if (!f) return
+    if (f.size > 2 * 1024 * 1024) return toast.error('الصورة كبيرة (الحد 2MB)')
+    const reader = new FileReader()
+    reader.onload = () => setEditing(p => ({ ...p, image_url: reader.result }))
+    reader.readAsDataURL(f)
   }
 
   async function saveProduct() {
@@ -152,8 +134,7 @@ ${productLines || '⚠️ لا توجد منتجات مضافة حالياً. ا
     await window.api?.db.saveProduct(editing)
     toast.success('تم حفظ المنتج ✓')
     setEditing(null)
-    const prods = await window.api?.db.getProducts() || []
-    setProducts(prods)
+    setProducts(await window.api?.db.getProducts() || [])
   }
 
   async function deleteProduct(id) {
@@ -163,16 +144,50 @@ ${productLines || '⚠️ لا توجد منتجات مضافة حالياً. ا
     toast.success('تم حذف المنتج')
   }
 
-  async function importExcel() {
-    const res = await window.api?.excel.importProducts()
-    if (res?.success) { toast.success(`تم استيراد ${res.count} منتج ✓`); const p = await window.api?.db.getProducts(); setProducts(p||[]) }
-    else if (!res?.canceled) toast.error(res?.error || 'فشل الاستيراد')
+  // ---- Excel (client-side) ----
+  async function onImportExcel(e) {
+    const f = e.target.files?.[0]; e.target.value = ''
+    if (!f) return
+    try {
+      const buf = await f.arrayBuffer()
+      const wb = XLSX.read(buf, { type: 'array' })
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]])
+      if (!rows.length) return toast.error('الملف فارغ')
+      let count = 0
+      for (const r of rows) {
+        const name = r.name || r.Name || r['الاسم'] || r['اسم المنتج']
+        if (!name) continue
+        await window.api?.db.saveProduct({
+          name: String(name),
+          sku: r.sku || r.SKU || r['رقم المنتج'] || '',
+          price: Number(r.price || r['السعر'] || 0) || 0,
+          quantity: Number(r.quantity || r['الكمية'] || 0) || 0,
+          category: r.category || r['الفئة'] || '',
+          sizes: r.sizes || r['المقاسات'] || '',
+          description: r.description || r['الوصف'] || r['وصف المنتج'] || '',
+          custom_fields: {},
+        })
+        count++
+      }
+      toast.success(`تم استيراد ${count} منتج ✓`)
+      setProducts(await window.api?.db.getProducts() || [])
+    } catch (err) {
+      toast.error('فشل قراءة الملف — تأكد أنه Excel صحيح')
+    }
   }
 
-  async function exportExcel() {
-    const res = await window.api?.excel.exportProducts()
-    if (res?.success) toast.success('تم التصدير ✓')
-    else if (!res?.canceled) toast.error('فشل التصدير')
+  function exportExcel() {
+    if (!products.length) return toast.error('لا توجد منتجات للتصدير')
+    const data = products.map(p => {
+      const base = { name: p.name, sku: p.sku, price: p.price, quantity: p.quantity, category: p.category, sizes: p.sizes, description: p.description }
+      for (const cf of (fieldConfig.custom || [])) base[cf.label] = p.custom_fields?.[cf.key] || ''
+      return base
+    })
+    const ws = XLSX.utils.json_to_sheet(data)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Products')
+    XLSX.writeFile(wb, `products-${Date.now()}.xlsx`)
+    toast.success('تم التصدير ✓')
   }
 
   return (
@@ -202,7 +217,7 @@ ${productLines || '⚠️ لا توجد منتجات مضافة حالياً. ا
             </div>
             <div className="input-group">
               <label className="input-label">رقم التواصل</label>
-              <input className="input" value={store.contact_phone||''} onChange={e => setStore(s=>({...s,contact_phone:e.target.value}))} placeholder="+964..." />
+              <input className="input" value={store.contact_phone||''} onChange={e => setStore(s=>({...s,contact_phone:e.target.value}))} placeholder="+962..." />
             </div>
           </div>
           <div className="input-group">
@@ -224,7 +239,7 @@ ${productLines || '⚠️ لا توجد منتجات مضافة حالياً. ا
             </div>
             <div className="input-group">
               <label className="input-label">العملة</label>
-              <select className="select" value={store.currency||'IQD'} onChange={e => setStore(s=>({...s,currency:e.target.value}))}>
+              <select className="select" value={store.currency||'JOD'} onChange={e => setStore(s=>({...s,currency:e.target.value}))}>
                 {CURRENCIES.map(c => <option key={c.v} value={c.v}>{c.l}</option>)}
               </select>
             </div>
@@ -240,45 +255,87 @@ ${productLines || '⚠️ لا توجد منتجات مضافة حالياً. ا
       {/* Tab 1: Products */}
       {tab === 1 && (
         <div className="animate-fade">
+          <input ref={excelInputRef} type="file" accept=".xlsx,.xls,.csv" style={{display:'none'}} onChange={onImportExcel} />
+          <input ref={imgInputRef} type="file" accept="image/*" style={{display:'none'}} onChange={onPickImage} />
           <div className="flex justify-between items-center mb-4">
             <div className="flex gap-2">
               <button className="btn btn-primary btn-sm flex-center" onClick={() => setEditing(emptyProduct)}>
                 <img src={addIcon} className="btn-img-icon" /> منتج جديد
               </button>
-              <button className="btn btn-secondary btn-sm flex-center" onClick={importExcel}>
+              <button className="btn btn-secondary btn-sm flex-center" onClick={() => excelInputRef.current?.click()}>
                 <img src={excelIcon} className="btn-img-icon" /> استيراد Excel
               </button>
               <button className="btn btn-secondary btn-sm flex-center" onClick={exportExcel}>
                 <img src={excelIcon} className="btn-img-icon" /> تصدير Excel
               </button>
+              <button className="btn btn-secondary btn-sm flex-center" onClick={() => setShowFieldManager(true)}>
+                <img src={settingsIcon} className="btn-img-icon" /> تخصيص الحقول
+              </button>
             </div>
             <span className="badge badge-info">{products.length} منتج</span>
           </div>
+
+          {/* Field manager modal */}
+          {showFieldManager && (
+            <div className="card mb-4 animate-fade">
+              <div className="card-title">تخصيص حقول المنتجات</div>
+              <p style={{fontSize:12,color:'var(--text-muted)',marginBottom:10}}>فعّل أو ألغِ الحقول الافتراضية، وأضف حقولاً خاصة بمنتجاتك.</p>
+              <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:14}}>
+                {BUILTIN_FIELDS.map(f => (
+                  <label key={f.key} style={{display:'flex',alignItems:'center',gap:6,fontSize:13,background:'var(--glass-bg)',padding:'6px 10px',borderRadius:8,cursor:'pointer'}}>
+                    <input type="checkbox" checked={fieldConfig.enabled.includes(f.key)} onChange={() => toggleBuiltin(f.key)} />
+                    {f.label}
+                  </label>
+                ))}
+              </div>
+              <div style={{marginBottom:10}}>
+                <div style={{fontSize:13,fontWeight:600,marginBottom:6}}>حقول مخصّصة</div>
+                {(fieldConfig.custom||[]).map(cf => (
+                  <div key={cf.key} style={{display:'inline-flex',alignItems:'center',gap:6,background:'var(--glass-bg)',padding:'4px 10px',borderRadius:8,margin:'0 6px 6px 0'}}>
+                    {cf.label}
+                    <button className="btn btn-danger btn-sm" style={{padding:'1px 7px'}} onClick={() => removeCustomField(cf.key)}>✕</button>
+                  </div>
+                ))}
+                <div className="flex gap-2" style={{marginTop:6}}>
+                  <input className="input" id="new-field-input" placeholder="اسم الحقل الجديد (مثلاً: اللون، الوزن)" style={{maxWidth:280}}
+                    onKeyDown={e => { if (e.key==='Enter') { addCustomField(e.target.value); e.target.value='' } }} />
+                  <button className="btn btn-secondary btn-sm" onClick={() => { const el=document.getElementById('new-field-input'); addCustomField(el.value); el.value='' }}>+ إضافة</button>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <button className="btn btn-primary btn-sm" onClick={saveFieldConfig}>حفظ التخصيص</button>
+                <button className="btn btn-secondary btn-sm" onClick={() => setShowFieldManager(false)}>إغلاق</button>
+              </div>
+            </div>
+          )}
 
           {editing && (
             <div className="card mb-4 animate-fade product-form">
               <div className="card-title">{editing.id ? 'تعديل المنتج' : 'منتج جديد'}</div>
               <div className="grid-3">
-                <div className="input-group"><label className="input-label">رقم المنتج (SKU)</label><input className="input" value={editing.sku||''} onChange={e=>setEditing(p=>({...p,sku:e.target.value}))} /></div>
                 <div className="input-group"><label className="input-label">اسم المنتج *</label><input className="input" value={editing.name||''} onChange={e=>setEditing(p=>({...p,name:e.target.value}))} /></div>
-                <div className="input-group"><label className="input-label">الفئة</label><input className="input" value={editing.category||''} onChange={e=>setEditing(p=>({...p,category:e.target.value}))} /></div>
-                <div className="input-group"><label className="input-label">السعر</label><input type="number" className="input" value={editing.price||''} onChange={e=>setEditing(p=>({...p,price:e.target.value}))} /></div>
-                <div className="input-group"><label className="input-label">الكمية</label><input type="number" className="input" value={editing.quantity||''} onChange={e=>setEditing(p=>({...p,quantity:e.target.value}))} /></div>
-                <div className="input-group"><label className="input-label">المقاسات</label><input className="input" value={editing.sizes||''} onChange={e=>setEditing(p=>({...p,sizes:e.target.value}))} placeholder="S, M, L, XL" /></div>
+                {enabledBuiltins.filter(f => f.type !== 'textarea').map(f => (
+                  <div className="input-group" key={f.key}>
+                    <label className="input-label">{f.label}</label>
+                    <input type={f.type==='number'?'number':'text'} className="input" value={editing[f.key]||''} onChange={e=>setEditing(p=>({...p,[f.key]:e.target.value}))} placeholder={f.key==='sizes'?'S, M, L, XL':''} />
+                  </div>
+                ))}
+                {(fieldConfig.custom||[]).map(cf => (
+                  <div className="input-group" key={cf.key}>
+                    <label className="input-label">{cf.label}</label>
+                    <input className="input" value={editing.custom_fields?.[cf.key]||''} onChange={e=>setEditing(p=>({...p,custom_fields:{...(p.custom_fields||{}),[cf.key]:e.target.value}}))} />
+                  </div>
+                ))}
               </div>
-              <div className="input-group"><label className="input-label">وصف المنتج</label><textarea className="textarea" style={{minHeight:70}} value={editing.description||''} onChange={e=>setEditing(p=>({...p,description:e.target.value}))} /></div>
+              {enabledBuiltins.some(f => f.key==='description') && (
+                <div className="input-group"><label className="input-label">وصف المنتج</label><textarea className="textarea" style={{minHeight:70}} value={editing.description||''} onChange={e=>setEditing(p=>({...p,description:e.target.value}))} /></div>
+              )}
               <div className="input-group" style={{gridColumn:'1/-1'}}>
                 <label className="input-label">صورة المنتج</label>
                 <div className="product-image-row">
-                  {editing?.image_url && (
-                    <img src={editing.image_url} alt="product" className="product-thumb" />
-                  )}
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={pickProductImage}>
-                    📷 اختر صورة من الجهاز
-                  </button>
-                  {editing?.image_url && (
-                    <button type="button" className="btn btn-danger btn-sm" onClick={() => setEditing(p => ({...p, image_url: ''}))}>✕ حذف</button>
-                  )}
+                  {editing?.image_url && <img src={editing.image_url} alt="product" className="product-thumb" />}
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => imgInputRef.current?.click()}>📷 اختر صورة من الجهاز</button>
+                  {editing?.image_url && <button type="button" className="btn btn-danger btn-sm" onClick={() => setEditing(p => ({...p, image_url: ''}))}>✕ حذف</button>}
                 </div>
               </div>
               <div className="flex gap-3">
@@ -290,32 +347,21 @@ ${productLines || '⚠️ لا توجد منتجات مضافة حالياً. ا
 
           <div className="table-wrap">
             <table>
-              <thead><tr><th>الصورة</th><th>SKU</th><th>الاسم</th><th>السعر</th><th>الكمية</th><th>المقاسات</th><th>الفئة</th><th>إجراء</th></tr></thead>
+              <thead><tr><th>الصورة</th><th>الاسم</th><th>السعر</th><th>الكمية</th><th>الفئة</th><th>إجراء</th></tr></thead>
               <tbody>
                 {products.length === 0 ? (
-                  <tr><td colSpan={8}><div className="empty-state"><p>لا توجد منتجات — أضف أو استورد من Excel</p></div></td></tr>
+                  <tr><td colSpan={6}><div className="empty-state"><p>لا توجد منتجات — أضف أو استورد من Excel</p></div></td></tr>
                 ) : products.map(p => (
                   <tr key={p.id}>
-                    <td>
-                      {p.image_url
-                        ? <img src={p.image_url} alt={p.name} className="product-table-thumb" />
-                        : <div className="no-img">📦</div>
-                      }
-                    </td>
-                    <td><span className="badge badge-info">{p.sku||'—'}</span></td>
+                    <td>{p.image_url ? <img src={p.image_url} alt={p.name} className="product-table-thumb" /> : <div className="no-img">📦</div>}</td>
                     <td><strong>{p.name}</strong>{p.description && <div style={{fontSize:11,color:'var(--text-muted)'}}>{p.description.slice(0,40)}</div>}</td>
                     <td><strong style={{color:'var(--accent-green)'}}>{Number(p.price||0).toLocaleString()}</strong></td>
                     <td><span className={`badge ${p.quantity > 0 ? 'badge-success' : 'badge-danger'}`}>{p.quantity ?? '—'}</span></td>
-                    <td>{p.sizes||'—'}</td>
                     <td>{p.category||'—'}</td>
                     <td>
                       <div className="flex gap-2">
-                        <button className="btn btn-secondary btn-sm p-1" onClick={() => setEditing(p)} title="تعديل">
-                          <img src={editIcon} className="btn-img-icon" />
-                        </button>
-                        <button className="btn btn-danger btn-sm p-1" onClick={() => deleteProduct(p.id)} title="حذف">
-                          <img src={deleteIcon} className="btn-img-icon" />
-                        </button>
+                        <button className="btn btn-secondary btn-sm p-1" onClick={() => setEditing({ ...p, custom_fields: p.custom_fields || {} })} title="تعديل"><img src={editIcon} className="btn-img-icon" /></button>
+                        <button className="btn btn-danger btn-sm p-1" onClick={() => deleteProduct(p.id)} title="حذف"><img src={deleteIcon} className="btn-img-icon" /></button>
                       </div>
                     </td>
                   </tr>
@@ -330,7 +376,7 @@ ${productLines || '⚠️ لا توجد منتجات مضافة حالياً. ا
       {tab === 2 && (
         <div className="card animate-fade">
           <div className="card-title">System Prompt الذكي</div>
-          <p style={{color:'var(--text-secondary)',fontSize:13,marginBottom:16}}>هذا هو التعليمات التي تُعطى للـ AI لكي يعمل كموظف مبيعات لمتجرك. يُبنى تلقائياً من إعدادات المتجر والمنتجات.</p>
+          <p style={{color:'var(--text-secondary)',fontSize:13,marginBottom:16}}>التعليمات التي تُعطى للـ AI ليعمل كموظف مبيعات لمتجرك. يُبنى تلقائياً من إعدادات المتجر والمنتجات.</p>
           <button className="btn btn-secondary btn-sm mb-4" onClick={buildPrompt}>بناء تلقائي من إعدادات المتجر</button>
           <div className="input-group">
             <label className="input-label">System Prompt (قابل للتعديل اليدوي)</label>

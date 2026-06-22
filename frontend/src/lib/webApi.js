@@ -50,6 +50,7 @@ export function installWebApi() {
       getComments: (postId) => rpc('facebook:getComments', { postId }),
       replyComment: (commentId, message) => rpc('facebook:replyComment', { commentId, message }),
       onMessage: (cb) => on('facebook:message', cb),
+      removeListeners: () => removeAll('facebook:message'),
       oauthLogin: () => rpc('oauth:facebook'),
       getPages: (userToken) => rpc('facebook:getPages', { userToken }),
       connectWithPage: (payload) => rpc('facebook:connectWithPage', payload),
@@ -62,6 +63,7 @@ export function installWebApi() {
       getComments: (mediaId) => rpc('instagram:getComments', { mediaId }),
       replyComment: (commentId, message) => rpc('instagram:replyComment', { commentId, message }),
       onMessage: (cb) => on('instagram:message', cb),
+      removeListeners: () => removeAll('instagram:message'),
       getFromPage: (payload) => rpc('instagram:getFromPage', payload),
       connectFromPage: (payload) => rpc('instagram:connectFromPage', payload),
     },
@@ -89,6 +91,7 @@ export function installWebApi() {
       getStatus: () => rpc('telegram:getStatus'),
       sendMessage: (payload) => rpc('telegram:sendMessage', payload),
       onMessage: (cb) => on('telegram:message', cb),
+      removeListeners: () => removeAll('telegram:message'),
     },
 
     db: {

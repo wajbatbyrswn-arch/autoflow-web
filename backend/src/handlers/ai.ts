@@ -21,6 +21,13 @@ function getBaseUrl(provider: string) {
 
 interface AIConfig { provider: string; model?: string; apiKey?: string; baseUrl?: string; }
 
+/** All Gemini keys to rotate through: the config key first, then comma-separated env keys. */
+function geminiKeys(primary?: string): string[] {
+  const envKeys = (process.env.GEMINI_API_KEY || '').split(',').map(s => s.trim()).filter(Boolean);
+  const all = [primary, ...envKeys].filter(Boolean) as string[];
+  return [...new Set(all)];
+}
+
 /** Resolve a user's AI config; fallback to owner's Gemini key + admin-assigned model. */
 export async function resolveConfig(userId: string): Promise<AIConfig> {
   const activeProvider = await getSetting(userId, 'active_ai_provider');
@@ -68,11 +75,23 @@ export async function sendToAI(config: AIConfig, messages: Array<{ role: string;
       contents, generationConfig: { maxOutputTokens: 1024, temperature: 0.7 },
     };
     const modelName = normalizeGoogleModelName(model);
-    const res = await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
-      payload, { timeout: 30000 }
-    );
-    return res.data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    // Rotate among all configured Gemini keys; on 429 (quota/rate limit) try the next.
+    const keys = geminiKeys(apiKey);
+    let lastErr: any;
+    for (const k of keys) {
+      try {
+        const res = await axios.post(
+          `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${k}`,
+          payload, { timeout: 30000 }
+        );
+        return res.data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      } catch (e: any) {
+        lastErr = e;
+        if (e?.response?.status === 429) { await new Promise(r => setTimeout(r, 500)); continue; }
+        throw e;
+      }
+    }
+    throw lastErr;
   }
 
   if (provider === 'ollama') {

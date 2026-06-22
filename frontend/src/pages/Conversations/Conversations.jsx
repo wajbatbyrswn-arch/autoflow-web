@@ -60,6 +60,15 @@ export default function Conversations() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  // Lightweight polling fallback (SSE can be flaky across hosts): refresh every 5s.
+  useEffect(() => {
+    const iv = setInterval(() => {
+      loadConvs()
+      if (selected) loadMessages(selected.id)
+    }, 5000)
+    return () => clearInterval(iv)
+  }, [selected, platformFilter])
+
   // Real-time message listeners
   useEffect(() => {
     const onMsg = () => {
