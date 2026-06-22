@@ -34,7 +34,9 @@ function normalize(raw: any) {
     dedupKey: String(raw.platform_message_id ?? raw.nashir_message_id ?? raw.id ?? `gen_${Date.now()}`),
     base,
     isComment,
-    platform: `${base}_${isComment ? 'comment' : 'dm'}`,
+    // Conversation platform = base (facebook|instagram|whatsapp) so the inbox filter
+    // tabs and platform icons match. DM vs comment is tracked on the message row.
+    platform: base,
     senderId: String(raw.sender_id ?? raw.from ?? raw.senderId ?? ''),
     senderName: String(raw.sender_name ?? raw.senderName ?? raw.name ?? 'عميل'),
     content: String(raw.message ?? raw.text ?? raw.message_text ?? raw.body ?? raw.content ?? ''),

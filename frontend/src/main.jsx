@@ -26,9 +26,12 @@ function Gate() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
-    const { data: listener } = supabase.auth.onAuthStateChange((_e, s) => {
-      setSession(s)
-      setSub(null); setSubError(false)
+    const { data: listener } = supabase.auth.onAuthStateChange((event, s) => {
+      // Only react to real sign-in/out. TOKEN_REFRESHED / focus events must NOT
+      // reset the subscription check (that caused the "checking subscription" flash).
+      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'INITIAL_SESSION') {
+        setSession(s)
+      }
     })
     return () => listener.subscription.unsubscribe()
   }, [])
@@ -43,10 +46,12 @@ function Gate() {
       })
   }
 
+  // Re-check only when the logged-in user actually changes (not on token refresh).
+  const uid = session?.user?.id
   useEffect(() => {
-    if (!session) return
+    if (!uid) return
     refreshStatus()
-  }, [session])
+  }, [uid])
 
   if (session === undefined) return <Screen>جارٍ التحميل...</Screen>
   if (!session) return <Login />
