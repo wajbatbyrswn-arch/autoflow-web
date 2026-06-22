@@ -60,6 +60,14 @@ app.get('/api/events', async (req, res) => {
   res.on('close', () => clearInterval(ping));
 });
 
+// Never let a background error (e.g. Nashir/Gemini 429) crash the server.
+process.on('unhandledRejection', (reason) => {
+  console.error('[unhandledRejection]', (reason as any)?.message || reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err?.message || err);
+});
+
 app.listen(PORT, () => {
   console.log(`AutoFlow API running on port ${PORT}`);
   startPoller();
