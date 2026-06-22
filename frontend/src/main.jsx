@@ -63,7 +63,15 @@ function Gate() {
     )
   }
 
-  if (sub === null) return <Screen>جارٍ التحقق من الاشتراك...</Screen>
+  if (sub === null) return (
+    <Screen>
+      <p>جارٍ التحقق من الاشتراك...</p>
+      <button onClick={async () => { try { await supabase.auth.signOut() } catch {}; localStorage.clear(); location.reload() }}
+        style={{ marginTop: 8, background: 'none', border: 'none', color: 'var(--text-secondary,#9aa0ac)', fontSize: 12, cursor: 'pointer', textDecoration: 'underline', fontFamily: 'Cairo, sans-serif' }}>
+        تأخّر التحميل؟ إعادة تعيين الجلسة
+      </button>
+    </Screen>
+  )
 
   if (sub.subscription_status !== 'active') {
     return <Activate onActivated={() => rpc('activation:status').then(setSub)} />

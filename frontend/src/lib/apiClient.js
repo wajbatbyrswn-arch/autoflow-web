@@ -3,9 +3,18 @@ import { supabase } from './supabaseClient'
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
 
 async function authHeader() {
-  const { data } = await supabase.auth.getSession()
-  const token = data?.session?.access_token
-  return token ? { Authorization: `Bearer ${token}` } : {}
+  try {
+    // getSession() can hang if supabase-js gets stuck refreshing a stale token.
+    // Race it with a timeout so a request never blocks forever.
+    const { data } = await Promise.race([
+      supabase.auth.getSession(),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('session-timeout')), 7000)),
+    ])
+    const token = data?.session?.access_token
+    return token ? { Authorization: `Bearer ${token}` } : {}
+  } catch {
+    return {}
+  }
 }
 
 /**
