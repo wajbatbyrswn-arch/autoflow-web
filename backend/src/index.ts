@@ -5,6 +5,8 @@ import { verifyToken, getBearer } from './auth';
 import { registerAll, dispatch } from './rpc';
 import { addClient } from './events';
 import { startPoller } from './jobs/poller';
+import { supabase } from './supabase';
+import { handleNashirWebhook } from './handlers/inbound';
 
 import { dbHandlers } from './handlers/db';
 import { aiHandlers } from './handlers/ai';
@@ -30,6 +32,20 @@ registerAll({
 });
 
 app.get('/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
+
+// Per-user Nashir webhook: paste this URL (with the user's token) into Nashir's workflow.
+// Public endpoint — identified by the secret token in the path.
+app.all('/api/nashir/webhook/:token', async (req, res) => {
+  const token = req.params.token;
+  const { data: user } = await supabase
+    .from('user_profiles').select('user_id').eq('nashir_webhook_token', token).single();
+  if (!user) return res.status(404).json({ error: 'unknown webhook token' });
+  // Acknowledge immediately so Nashir doesn't retry/timeout; process in background.
+  res.json({ ok: true });
+  if (req.method === 'POST' && req.body) {
+    handleNashirWebhook(user.user_id, req.body).catch((e) => console.error('[nashir webhook]', e?.message || e));
+  }
+});
 
 // Single RPC endpoint: { channel, payload } -> { result }
 app.post('/api/rpc', async (req, res) => {

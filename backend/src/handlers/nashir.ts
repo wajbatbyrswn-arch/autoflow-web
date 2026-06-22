@@ -46,23 +46,31 @@ export const nashirHandlers = {
   // ---- Connection management UI (Settings → Platforms) ----
   // Returns the Nashir connection state + connected accounts grouped by platform.
   'nashir:status': async ({ userId }: Ctx) => {
-    const { data } = await supabase.from('user_profiles').select('nashir_api_key').eq('user_id', userId).single();
+    const { data } = await supabase.from('user_profiles')
+      .select('nashir_api_key, nashir_account_ids, is_admin').eq('user_id', userId).single();
     const ownKey = (data?.nashir_api_key || '').trim();
     const key = ownKey || process.env.NASHIR_API_KEY || '';
+    const assigned: string[] = Array.isArray(data?.nashir_account_ids) ? data!.nashir_account_ids.map(String) : [];
     const result: any = {
       hasKey: !!ownKey,
       usingOwnerKey: !ownKey && !!process.env.NASHIR_API_KEY,
       dashboardUrl: NASHIR_DASHBOARD,
       platforms: { whatsapp: [], instagram: [], facebook: [], telegram: [] },
+      connectedCount: 0,
       error: null,
     };
     if (!key) return result;
     try {
-      const accounts = await nashir.accounts(key);
+      let accounts = await nashir.accounts(key);
+      // A normal client sees only the pages the admin assigned to them.
+      // An admin with no assignment sees everything (for management/testing).
+      if (assigned.length) accounts = accounts.filter((a: any) => assigned.includes(String(a.pageId)));
+      else if (!data?.is_admin) accounts = [];
       for (const a of accounts) {
         const p = String(a.platform || '').toLowerCase();
         if (result.platforms[p]) result.platforms[p].push(a);
       }
+      result.connectedCount = accounts.length;
     } catch (e: any) {
       result.error = e?.response?.status === 401 ? 'مفتاح API غير صحيح' : (e?.message || 'تعذّر الاتصال بناشر');
     }

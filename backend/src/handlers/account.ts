@@ -15,7 +15,7 @@ async function ensureProfile(userId: string) {
     fullName = (data.user?.user_metadata as any)?.full_name || '';
   } catch {}
 
-  await supabase.from('user_profiles').insert({ user_id: userId, email, full_name: fullName });
+  await supabase.from('user_profiles').insert({ user_id: userId, email, full_name: fullName, nashir_webhook_token: crypto.randomUUID() });
   await supabase.from('store_config').insert({ user_id: userId, store_name: fullName || 'متجري' });
   // TODO(nashir): create a Nashir business for this user and store nashir_api_key/business_id here.
 }
@@ -70,7 +70,16 @@ export const accountHandlers = {
   'admin:getUsers': async ({ userId }: Ctx) => {
     await requireAdmin(userId);
     const { data } = await supabase.from('user_profiles').select('*').order('created_at', { ascending: false });
-    return data || [];
+    const users = data || [];
+    // Backfill webhook tokens for any user created before this column existed.
+    for (const u of users) {
+      if (!u.nashir_webhook_token) {
+        const token = crypto.randomUUID();
+        await supabase.from('user_profiles').update({ nashir_webhook_token: token }).eq('user_id', u.user_id);
+        u.nashir_webhook_token = token;
+      }
+    }
+    return users;
   },
   'admin:updateUser': async ({ userId }: Ctx, { target_user_id, ai_model, subscription_status, is_admin, nashir_account_ids, nashir_business_id }: any) => {
     await requireAdmin(userId);

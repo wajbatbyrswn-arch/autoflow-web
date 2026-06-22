@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
-import { rpc } from '../../lib/apiClient'
+import { rpc, BACKEND_URL } from '../../lib/apiClient'
 
 const MODELS = [
   { value: 'gemini-2.5-flash-lite', label: 'Flash Lite 2.5 (أرخص)' },
@@ -74,7 +74,7 @@ export default function Admin() {
         <h2 style={h2}>المستخدمون ({users.length})</h2>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
           <thead><tr style={{ textAlign: 'right', opacity: .7 }}>
-            <th style={th}>المتجر</th><th style={th}>الحالة</th><th style={th}>الموديل</th><th style={th}>الاشتراك</th><th style={th}>صفحات ناشر (الفصل)</th>
+            <th style={th}>المتجر</th><th style={th}>الحالة</th><th style={th}>الموديل</th><th style={th}>الاشتراك</th><th style={th}>صفحات ناشر (الفصل)</th><th style={th}>ربط ناشر (Webhook + Business)</th>
           </tr></thead>
           <tbody>
             {users.map(u => (
@@ -102,6 +102,19 @@ export default function Admin() {
                     ))}
                   </select>
                   <div style={{ fontSize: 10, opacity: .5, marginTop: 2 }}>اتركه فارغاً = كل الرسائل (تجربة)</div>
+                </td>
+                <td style={{ ...td, minWidth: 280 }}>
+                  <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                    <input dir="ltr" readOnly value={`${BACKEND_URL}/api/nashir/webhook/${u.nashir_webhook_token || ''}`}
+                      style={{ ...sel, flex: 1, fontSize: 11, fontFamily: 'monospace' }}
+                      onFocus={e => e.target.select()} />
+                    <button onClick={() => { navigator.clipboard.writeText(`${BACKEND_URL}/api/nashir/webhook/${u.nashir_webhook_token || ''}`); toast.success('تم نسخ رابط الويبهوك') }}
+                      style={{ ...btn, padding: '6px 12px' }}>نسخ</button>
+                  </div>
+                  <input dir="ltr" placeholder="business_id (من ناشر)"
+                    defaultValue={u.nashir_business_id || ''}
+                    onBlur={e => { if (e.target.value !== (u.nashir_business_id||'')) updateUser(u.user_id, { nashir_business_id: e.target.value.trim() }) }}
+                    style={{ ...sel, width: '100%', fontSize: 12 }} />
                 </td>
               </tr>
             ))}
