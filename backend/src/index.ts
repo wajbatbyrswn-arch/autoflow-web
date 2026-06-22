@@ -40,10 +40,14 @@ app.all('/api/nashir/webhook/:token', async (req, res) => {
   const { data: user } = await supabase
     .from('user_profiles').select('user_id').eq('nashir_webhook_token', token).single();
   if (!user) return res.status(404).json({ error: 'unknown webhook token' });
-  // Acknowledge immediately so Nashir doesn't retry/timeout; process in background.
-  res.json({ ok: true });
-  if (req.method === 'POST' && req.body) {
-    handleNashirWebhook(user.user_id, req.body).catch((e) => console.error('[nashir webhook]', e?.message || e));
+  if (req.method !== 'POST' || !req.body) return res.json({ ok: true });
+  try {
+    // Nashir's chatbot custom-webhook expects the reply in the HTTP response body.
+    const { reply, replies } = await handleNashirWebhook(user.user_id, req.body);
+    return res.json({ reply, replies, response: reply, text: reply, ok: true });
+  } catch (e: any) {
+    console.error('[nashir webhook]', e?.message || e);
+    return res.json({ ok: true });
   }
 });
 
