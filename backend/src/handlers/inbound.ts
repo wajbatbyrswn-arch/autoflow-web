@@ -10,7 +10,7 @@ async function buildSystemPrompt(userId: string): Promise<string> {
   if (products?.length) {
     prompt += '\n\n### المتوفر حالياً ###\n' + products.map(p => `- ${p.name}: ${p.price}، الكمية ${p.quantity}`).join('\n');
   }
-  prompt += '\n\nتنبيه: لا تستخدم تنسيق Markdown؛ اكتب نصاً عادياً مختصراً (٣ جمل كحد أقصى) بنفس لغة العميل.';
+  prompt += '\n\nقواعد الرد الإلزامية:\n1. لا تستخدم أي رموز تنسيق مثل * أو ** أو _ أو # أو - في ردودك. اكتب نصاً عادياً فقط.\n2. اكتب 3 جمل كحد أقصى بنفس لغة العميل.\n3. عندما يُؤكد العميل طلبه، ضع بيانات الطلب مباشرةً في بداية ردك بهذا الشكل الحرفي ثم أكمل رسالتك العادية:\n[ORDER_READY]{"customer_name":"...","customer_phone":"...","customer_city":"...","customer_area":"...","products":[{"name":"...","quantity":1,"price":0}],"total_amount":0}[/ORDER_READY]';
   return prompt;
 }
 
@@ -44,6 +44,53 @@ function normalize(raw: any) {
     content: String(raw.message ?? raw.text ?? raw.message_text ?? raw.body ?? raw.content ?? ''),
     pageId: raw.page_id ?? raw.pageId ?? null,
   };
+}
+
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/\*\*(.*?)\*\*/gs, '$1')
+    .replace(/\*(.*?)\*/gs, '$1')
+    .replace(/__(.*?)__/gs, '$1')
+    .replace(/_(.*?)_/gs, '$1')
+    .replace(/~~(.*?)~~/gs, '$1')
+    .replace(/`(.*?)`/gs, '$1')
+    .replace(/^#{1,6}\s+/gm, '')
+    .trim();
+}
+
+async function maybeExtractAndSaveOrder(
+  reply: string, userId: string, convId: number, platform: string, senderName: string
+): Promise<string> {
+  const match = reply.match(/\[ORDER_READY\]([\s\S]*?)\[\/ORDER_READY\]/);
+  if (!match) return reply;
+
+  try {
+    const orderData = JSON.parse(match[1].trim());
+    const products = orderData.products || [];
+    const total = orderData.total_amount
+      || products.reduce((s: number, p: any) => s + ((Number(p.price) || 0) * (Number(p.quantity) || 1)), 0);
+    const orderNum = 'ORD-' + Date.now();
+    await supabase.from('orders').insert({
+      user_id: userId,
+      order_number: orderNum,
+      customer_name: orderData.customer_name || senderName,
+      customer_phone: orderData.customer_phone || '',
+      customer_city: orderData.customer_city || '',
+      customer_area: orderData.customer_area || '',
+      customer_notes: orderData.notes || '',
+      products_json: JSON.stringify(products),
+      total_amount: total,
+      platform,
+      conversation_id: convId,
+      status: 'new',
+    });
+    console.log(`[inbound] order saved: ${orderNum} for conv ${convId}`);
+  } catch (e: any) {
+    console.error('[inbound order parse]', e?.message || e);
+  }
+
+  // Strip the tag block from the reply sent to the customer
+  return reply.replace(/\[ORDER_READY\][\s\S]*?\[\/ORDER_READY\]/g, '').trim();
 }
 
 /**
@@ -149,6 +196,12 @@ export async function processInbound(userId: string, raw: any): Promise<string> 
       ...liveMsgs,
       { role: 'user', content: item.content },
     ]);
+
+    // Extract [ORDER_READY] tag → save order to DB, strip from reply
+    reply = await maybeExtractAndSaveOrder(reply, userId, conv!.id, item.platform, item.senderName);
+
+    // Strip any remaining markdown symbols (safety net)
+    reply = stripMarkdown(reply);
 
     // Trigger background compression once history grows large (fire-and-forget, don't block reply)
     maybeCompressHistory(conv!.id, userId, config).catch(() => {});
