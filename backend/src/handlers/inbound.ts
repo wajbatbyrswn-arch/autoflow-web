@@ -46,6 +46,59 @@ function normalize(raw: any) {
   };
 }
 
+/**
+ * Compress old messages into a summary and store it on the conversation.
+ * Called in background when history exceeds COMPRESS_THRESHOLD.
+ */
+async function maybeCompressHistory(convId: number, userId: string, config: any) {
+  const COMPRESS_THRESHOLD = 20; // compress after 20 messages total
+  const KEEP_RECENT = 10;        // keep last 10 as live context
+
+  // Count total messages in this conversation
+  const { count } = await supabase.from('messages')
+    .select('id', { count: 'exact', head: true })
+    .eq('conversation_id', convId);
+
+  if ((count || 0) < COMPRESS_THRESHOLD) return;
+
+  // Fetch messages to compress (everything except the last KEEP_RECENT)
+  const { data: allMsgs } = await supabase.from('messages')
+    .select('sender, content, created_at')
+    .eq('conversation_id', convId)
+    .order('created_at', { ascending: true })
+    .limit(count! - KEEP_RECENT);
+
+  if (!allMsgs?.length) return;
+
+  // Also get existing summary to fold into
+  const { data: conv } = await supabase.from('conversations')
+    .select('context_summary').eq('id', convId).single();
+
+  const prevSummary = conv?.context_summary || '';
+  const transcript = allMsgs
+    .filter((m: any) => m.content)
+    .map((m: any) => `${m.sender === 'customer' ? 'عميل' : 'مساعد'}: ${m.content}`)
+    .join('\n');
+
+  const summaryPrompt = prevSummary
+    ? `لديك ملخص سابق للمحادثة:\n${prevSummary}\n\nوهذه رسائل إضافية:\n${transcript}\n\nأنشئ ملخصاً موحداً ومحدثاً بالعربية (أقل من 300 كلمة) يحتفظ بالمعلومات الجوهرية: اسم العميل، رقم الهاتف، العنوان، الطلبات، والقرارات المهمة. تجاهل التحيات والكلام العام.`
+    : `لديك محادثة بين عميل ومساعد:\n${transcript}\n\nأنشئ ملخصاً بالعربية (أقل من 300 كلمة) يحتفظ بالمعلومات الجوهرية: اسم العميل، رقم الهاتف، العنوان، الطلبات، والقرارات المهمة. تجاهل التحيات والكلام العام.`;
+
+  try {
+    const summary = await sendToAI(config, [
+      { role: 'user', content: summaryPrompt },
+    ]);
+    if (summary) {
+      await supabase.from('conversations')
+        .update({ context_summary: summary })
+        .eq('id', convId);
+      console.log(`[inbound] compressed history for conv ${convId} (${count} msgs → summary)`);
+    }
+  } catch (e: any) {
+    console.error('[inbound compress]', e?.message || e);
+  }
+}
+
 /** Process one inbound item: store it, get AI reply, and SEND it back via Nashir REST. Returns the reply text. */
 export async function processInbound(userId: string, raw: any): Promise<string> {
   const item = normalize(raw);
@@ -71,18 +124,34 @@ export async function processInbound(userId: string, raw: any): Promise<string> 
   try {
     const config = await resolveConfig(userId);
     const system = await buildSystemPrompt(userId);
-    // Include recent conversation history so the AI remembers context (no more amnesia/greeting loops).
-    const { data: history } = await supabase.from('messages')
-      .select('sender, content').eq('conversation_id', conv!.id)
-      .order('created_at', { ascending: true }).limit(20);
-    const historyMsgs = (history || [])
+
+    // Build context: use compressed summary (if any) + last 10 live messages.
+    // This gives the AI a full picture without blowing the context window.
+    const LIVE_WINDOW = 10;
+    const { data: recentMsgs } = await supabase.from('messages')
+      .select('sender, content')
+      .eq('conversation_id', conv!.id)
+      .order('created_at', { ascending: false })
+      .limit(LIVE_WINDOW);
+
+    // Reverse so oldest-first for the AI
+    const liveMsgs = (recentMsgs || []).reverse()
       .filter((m: any) => m.content)
       .map((m: any) => ({ role: m.sender === 'customer' ? 'user' : 'assistant', content: m.content }));
+
+    // Prepend compressed summary as a system note if it exists
+    const summaryNote = conv!.context_summary
+      ? `\n\n[ملخص المحادثة السابقة مع هذا العميل:\n${conv!.context_summary}\n]`
+      : '';
+
     reply = await sendToAI(config, [
-      { role: 'system', content: system },
-      ...historyMsgs,
+      { role: 'system', content: system + summaryNote },
+      ...liveMsgs,
       { role: 'user', content: item.content },
     ]);
+
+    // Trigger background compression once history grows large (fire-and-forget, don't block reply)
+    maybeCompressHistory(conv!.id, userId, config).catch(() => {});
   } catch (e: any) { console.error('[inbound AI]', e?.message || e); }
 
   if (!exists) {
