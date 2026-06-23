@@ -2,12 +2,8 @@ import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { rpc, BACKEND_URL } from '../../lib/apiClient'
 
-const MODELS = [
-  { value: 'gemini-2.5-flash-lite', label: 'Flash Lite 2.5 (أرخص)' },
-  { value: 'gemini-2.5-flash', label: 'Flash 2.5' },
-  { value: 'gemini-2.5-pro', label: 'Pro 2.5' },
-]
 const STATUS = { active: 'نشط', inactive: 'غير نشط', expired: 'منتهي' }
+const PROVIDER_LABELS = { google: 'Google Gemini', openai: 'OpenAI', anthropic: 'Anthropic', groq: 'Groq', mistral: 'Mistral', openrouter: 'OpenRouter', ollama: 'Ollama' }
 
 export default function Admin() {
   const [codes, setCodes] = useState([])
@@ -16,12 +12,16 @@ export default function Admin() {
   const [days, setDays] = useState(30)
   const [loading, setLoading] = useState(false)
   const [nashirAccounts, setNashirAccounts] = useState([])
+  const [aiProviders, setAiProviders] = useState([])
+  const [aiActive, setAiActive] = useState('google')
 
   async function load() {
     try {
       setCodes(await rpc('admin:getCodes'))
       setUsers(await rpc('admin:getUsers'))
       setNashirAccounts(await rpc('admin:nashirAccounts').catch(() => []))
+      const ai = await rpc('admin:getAiProviders').catch(() => null)
+      if (ai) { setAiProviders(ai.providers || []); setAiActive(ai.active || 'google') }
     } catch (e) { toast.error(e.message) }
   }
   useEffect(() => { load() }, [])
@@ -74,7 +74,7 @@ export default function Admin() {
         <h2 style={h2}>المستخدمون ({users.length})</h2>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
           <thead><tr style={{ textAlign: 'right', opacity: .7 }}>
-            <th style={th}>المتجر</th><th style={th}>الحالة</th><th style={th}>الموديل</th><th style={th}>الاشتراك</th><th style={th}>صفحات ناشر (الفصل)</th><th style={th}>ربط ناشر (Webhook + Business)</th>
+            <th style={th}>المتجر</th><th style={th}>الحالة</th><th style={th}>الشركة (الموديل)</th><th style={th}>الاشتراك</th><th style={th}>صفحات ناشر (الفصل)</th><th style={th}>ربط ناشر (Webhook + Business)</th>
           </tr></thead>
           <tbody>
             {users.map(u => (
@@ -82,8 +82,11 @@ export default function Admin() {
                 <td style={td}>{u.full_name || u.email || u.user_id.slice(0, 8)}</td>
                 <td style={td}>{STATUS[u.subscription_status] || u.subscription_status}</td>
                 <td style={td}>
-                  <select value={u.ai_model} onChange={e => updateUser(u.user_id, { ai_model: e.target.value })} style={sel}>
-                    {MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                  <select value={u.ai_provider || ''} onChange={e => updateUser(u.user_id, { ai_provider: e.target.value })} style={sel}>
+                    <option value="">⭐ الافتراضي ({PROVIDER_LABELS[aiActive] || aiActive})</option>
+                    {aiProviders.map(p => (
+                      <option key={p.provider} value={p.provider}>{PROVIDER_LABELS[p.provider] || p.provider}{p.model ? ` — ${p.model}` : ''}</option>
+                    ))}
                   </select>
                 </td>
                 <td style={td}>

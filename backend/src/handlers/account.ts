@@ -81,10 +81,11 @@ export const accountHandlers = {
     }
     return users;
   },
-  'admin:updateUser': async ({ userId }: Ctx, { target_user_id, ai_model, subscription_status, is_admin, nashir_account_ids, nashir_business_id }: any) => {
+  'admin:updateUser': async ({ userId }: Ctx, { target_user_id, ai_model, ai_provider, subscription_status, is_admin, nashir_account_ids, nashir_business_id }: any) => {
     await requireAdmin(userId);
     const updates: Record<string, unknown> = {};
     if (ai_model !== undefined) updates.ai_model = ai_model;
+    if (ai_provider !== undefined) updates.ai_provider = ai_provider || null;
     if (subscription_status !== undefined) updates.subscription_status = subscription_status;
     if (is_admin !== undefined) updates.is_admin = is_admin;
     if (nashir_account_ids !== undefined) {
