@@ -71,7 +71,18 @@ export async function processInbound(userId: string, raw: any): Promise<string> 
   try {
     const config = await resolveConfig(userId);
     const system = await buildSystemPrompt(userId);
-    reply = await sendToAI(config, [{ role: 'system', content: system }, { role: 'user', content: item.content }]);
+    // Include recent conversation history so the AI remembers context (no more amnesia/greeting loops).
+    const { data: history } = await supabase.from('messages')
+      .select('sender, content').eq('conversation_id', conv!.id)
+      .order('created_at', { ascending: true }).limit(20);
+    const historyMsgs = (history || [])
+      .filter((m: any) => m.content)
+      .map((m: any) => ({ role: m.sender === 'customer' ? 'user' : 'assistant', content: m.content }));
+    reply = await sendToAI(config, [
+      { role: 'system', content: system },
+      ...historyMsgs,
+      { role: 'user', content: item.content },
+    ]);
   } catch (e: any) { console.error('[inbound AI]', e?.message || e); }
 
   if (!exists) {
