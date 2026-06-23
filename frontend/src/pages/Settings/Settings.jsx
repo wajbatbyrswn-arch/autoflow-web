@@ -423,20 +423,19 @@ export default function Settings() {
 
               <div className="settings-grid">
                 {PLATFORM_CARDS.map(pc => {
+                  // Real connection status only — no fakes.
+                  // Telegram = user has a bot token saved on their profile.
+                  // FB/IG/WA = a matching account is actually returned by Nashir (after admin assignment).
                   let connected = false
-                  let info = ''
+                  let accounts = []
                   if (pc.key === 'telegram') {
                     connected = !!profile?.telegram_bot_token
-                    info = connected ? 'بوت تلغرام مفعّل' : ''
                   } else {
-                    const accounts = nashirState?.platforms?.[pc.key] || []
-                    const adminLinked = (profile?.nashir_account_ids || []).length > 0
-                    connected = accounts.length > 0 || (adminLinked && (pc.key === 'facebook' || pc.key === 'instagram' || pc.key === 'whatsapp'))
-                    if (accounts.length) info = accounts.map(a => a.pageName || a.page_name || a.username || '—').join('، ')
-                    else if (connected) info = 'تم الربط من قبل الفريق ✓'
+                    accounts = nashirState?.platforms?.[pc.key] || []
+                    connected = accounts.length > 0
                   }
                   return (
-                    <div key={pc.key} className="card platform-settings-card" style={{boxShadow:'none', border:`1px solid ${connected ? '#10b981' : 'var(--border-color)'}`}}>
+                    <div key={pc.key} className="card platform-settings-card" style={{boxShadow:'none', border:`1px solid ${connected ? '#10b981' : 'var(--border-color)'}`, position:'relative'}}>
                       <div className="platform-settings-header">
                         <div className="flex items-center gap-3">
                           <img src={pc.icon} className="platform-settings-img" />
@@ -445,13 +444,21 @@ export default function Settings() {
                             <div style={{fontSize:12, color:'var(--text-muted)'}}>{pc.sub}</div>
                           </div>
                         </div>
-                        <span className={`badge ${connected ? 'badge-success badge-dot' : 'badge-danger badge-dot'}`}>
-                          {connected ? 'مربوط ✓' : 'غير مربوط'}
-                        </span>
                       </div>
                       <div className="divider" />
                       {connected ? (
-                        <div style={{fontSize:13, color:'#34d399', marginBottom:12, lineHeight:1.7}}>{info}</div>
+                        <div style={{fontSize:13, color:'#34d399', marginBottom:12, lineHeight:1.7, display:'flex', flexDirection:'column', gap:4}}>
+                          <div style={{fontWeight:700}}>✓ تم الربط</div>
+                          {pc.key === 'telegram' ? (
+                            <div style={{fontSize:12, color:'var(--text-secondary)'}}>بوت تلغرام مفعّل</div>
+                          ) : (
+                            accounts.map((a, i) => (
+                              <div key={a.pageId || i} style={{fontSize:12, color:'var(--text-secondary)'}}>
+                                • {a.pageName || a.page_name || a.username || '—'}
+                              </div>
+                            ))
+                          )}
+                        </div>
                       ) : pc.key === 'telegram' ? (
                         <div style={{fontSize:12, color:'var(--text-muted)', marginBottom:12}}>
                           أدخل توكن البوت من <a href="https://t.me/BotFather" target="_blank" rel="noreferrer" style={{color:'var(--accent)'}}>@BotFather</a> أو اطلب من الفريق ربطه لك.
