@@ -10,6 +10,8 @@ import telegramIcon from '../../assets/icons/telegram.png'
 import whatsappIcon from '../../assets/icons/whatsapp.png'
 import saveIcon from '../../assets/icons/save.png'
 import { CURRENCIES } from '../../lib/currencies'
+import { compressImage } from '../../lib/imageCompress'
+import { refreshCurrency } from '../../lib/useCurrency'
 import './Settings.css'
 
 const TABS = [
@@ -107,32 +109,28 @@ export default function Settings() {
   }, [])
 
   const loadAll = useCallback(async () => {
-    // Meta accounts
-    const accounts = await window.api?.meta?.getAccounts() || []
-    setMetaAccounts(accounts)
-
-    // Telegram
-    const all = await window.api?.settings.getAll() || {}
-    if (all.telegram_token) setTgToken(all.telegram_token)
-    if (all.notif_method) setNotifMethod(all.notif_method)
-    if (all.notif_telegram_token) setNotifTgToken(all.notif_telegram_token)
-    if (all.admin_telegram_chat_id) setAdminChatId(all.admin_telegram_chat_id)
-    if (all.notif_email_user) setNotifEmailUser(all.notif_email_user)
-    if (all.notif_email_pass) setNotifEmailPass(all.notif_email_pass)
-    if (all.notif_email_to) setNotifEmailTo(all.notif_email_to)
-
-    // Store config
-    const store = await window.api?.db.getStoreConfig()
+    // Fire every read in parallel so the page doesn't wait for serial round-trips.
+    const [accounts, all, store, tgS, waS] = await Promise.all([
+      window.api?.meta?.getAccounts().catch(() => []) || [],
+      window.api?.settings.getAll().catch(() => ({})) || {},
+      window.api?.db.getStoreConfig().catch(() => ({})) || {},
+      window.api?.telegram?.getStatus?.().catch(() => ({})) || {},
+      window.api?.whatsapp.getStatus().catch(() => ({})) || {},
+    ])
+    setMetaAccounts(accounts || [])
+    if (all?.telegram_token) setTgToken(all.telegram_token)
+    if (all?.notif_method) setNotifMethod(all.notif_method)
+    if (all?.notif_telegram_token) setNotifTgToken(all.notif_telegram_token)
+    if (all?.admin_telegram_chat_id) setAdminChatId(all.admin_telegram_chat_id)
+    if (all?.notif_email_user) setNotifEmailUser(all.notif_email_user)
+    if (all?.notif_email_pass) setNotifEmailPass(all.notif_email_pass)
+    if (all?.notif_email_to) setNotifEmailTo(all.notif_email_to)
     if (store) {
       setStoreName(store.store_name || 'AutoFlow')
       setStoreLogo(store.store_logo || '')
-      setCurrency(store.currency || 'IQD')
+      setCurrency(store.currency || 'JOD')
     }
-
-    // WhatsApp / Telegram statuses
-    const tgS = await window.api?.telegram?.getStatus?.()
     setTgStatus(tgS?.status || 'disconnected')
-    const waS = await window.api?.whatsapp.getStatus()
     setWaStatus(waS?.status || 'disconnected')
   }, [])
 
@@ -352,8 +350,10 @@ export default function Settings() {
     setIsSavingProfile(true)
     const res = await window.api?.db.saveStoreConfig({ store_name: storeName, store_logo: storeLogo, currency })
     setIsSavingProfile(false)
-    if (res?.success) { toast.success('تم حفظ الملف الشخصي ✓'); window.location.reload() }
-    else toast.error('فشل الحفظ')
+    if (res?.success) {
+      await refreshCurrency()
+      toast.success('تم حفظ الملف الشخصي ✓')
+    } else toast.error('فشل الحفظ')
   }
 
   async function saveNotifSettings() {
@@ -491,12 +491,12 @@ export default function Settings() {
                 <div className="input-group">
                   <label className="input-label">شعار المتجر</label>
                   <input type="file" accept="image/*" style={{ display: 'none' }} id="logo-file-input"
-                    onChange={e => {
+                    onChange={async e => {
                       const f = e.target.files?.[0]; if (!f) return
-                      if (f.size > 2 * 1024 * 1024) { toast.error('الصورة كبيرة (الحد 2MB)'); return }
-                      const reader = new FileReader()
-                      reader.onload = () => setStoreLogo(reader.result)
-                      reader.readAsDataURL(f)
+                      try {
+                        const compressed = await compressImage(f, { maxDim: 400, quality: 0.85 })
+                        setStoreLogo(compressed)
+                      } catch { toast.error('فشل ضغط الصورة') }
                     }} />
                   <div className="flex gap-2">
                     <button type="button" className="btn btn-secondary btn-sm" onClick={() => document.getElementById('logo-file-input').click()}>

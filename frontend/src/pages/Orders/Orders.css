@@ -26,3 +26,20 @@
 .detail-row span:first-child { color:var(--text-secondary); }
 .product-line { display:flex; justify-content:space-between; font-size:13px; padding:6px 0; border-bottom:1px solid var(--border); }
 .status-btns { display:flex; flex-wrap:wrap; gap:6px; }
+
+.status-select {
+  padding: 5px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #2a2e37);
+  background: var(--bg-input, #1a1d24);
+  color: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  min-width: 110px;
+}
+.status-select.status-new { border-color:#3b82f6; color:#60a5fa; }
+.status-select.status-preparing { border-color:#f59e0b; color:#fbbf24; }
+.status-select.status-shipped { border-color:#8b5cf6; color:#a78bfa; }
+.status-select.status-delivered { border-color:#10b981; color:#34d399; }
+.status-select.status-cancelled { border-color:#ef4444; color:#f87171; }

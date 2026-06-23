@@ -6,6 +6,7 @@ import facebookIcon from '../../assets/icons/facebook.png'
 import instagramIcon from '../../assets/icons/instagram.png'
 import telegramIcon from '../../assets/icons/telegram.png'
 import excelIcon from '../../assets/icons/excel.png'
+import { useCurrency } from '../../lib/useCurrency'
 
 const STATUSES = [
   { v:'new', l:'جديد', cls:'badge-info' },
@@ -21,6 +22,7 @@ export default function Orders() {
   const [orders, setOrders] = useState([])
   const [selected, setSelected] = useState(null)
   const [filter, setFilter] = useState({ status:'', platform:'' })
+  const currency = useCurrency()
 
   useEffect(() => { loadOrders() }, [filter])
 
@@ -93,8 +95,12 @@ export default function Orders() {
                   <td>
                     <img src={PLATFORM_ICONS[o.platform]} alt={o.platform} className="platform-tiny-img" />
                   </td>
-                  <td><strong style={{color:'var(--accent2)'}}>{Number(o.total_amount||0).toLocaleString()} IQD</strong></td>
-                  <td><span className={`badge ${statusInfo(o.status).cls}`}>{statusInfo(o.status).l}</span></td>
+                  <td><strong style={{color:'var(--accent2)'}}>{Number(o.total_amount||0).toLocaleString()} {currency}</strong></td>
+                  <td onClick={e=>e.stopPropagation()}>
+                    <select className={`status-select status-${o.status}`} value={o.status||'new'} onChange={e=>updateStatus(o.id, e.target.value)}>
+                      {STATUSES.map(s => <option key={s.v} value={s.v}>{s.l}</option>)}
+                    </select>
+                  </td>
                   <td style={{fontSize:11,color:'var(--text-muted)'}}>{new Date(o.created_at).toLocaleDateString('ar')}</td>
                   <td><button className="btn btn-secondary btn-sm" onClick={e=>{e.stopPropagation();setSelected(o)}}>👁</button></td>
                 </tr>
@@ -120,11 +126,11 @@ export default function Orders() {
             {parseProducts(selected.products_json).map((p,i) => (
               <div key={i} className="product-line">
                 <span>{p.name}</span>
-                <span style={{color:'var(--accent2)'}}>{p.quantity} × {p.price?.toLocaleString()} = {(p.quantity*p.price).toLocaleString()}</span>
+                <span style={{color:'var(--accent2)'}}>{p.quantity} × {p.price?.toLocaleString()} = {(p.quantity*p.price).toLocaleString()} {currency}</span>
               </div>
             ))}
             <div className="divider" />
-            <div className="detail-row"><span>المبلغ الكلي</span><strong style={{color:'var(--accent2)',fontSize:16}}>{Number(selected.total_amount||0).toLocaleString()} IQD</strong></div>
+            <div className="detail-row"><span>المبلغ الكلي</span><strong style={{color:'var(--accent2)',fontSize:16}}>{Number(selected.total_amount||0).toLocaleString()} {currency}</strong></div>
             <div style={{fontWeight:600,marginBottom:8,fontSize:13,marginTop:16}}>تحديث الحالة:</div>
             <div className="status-btns">
               {STATUSES.map(s => (

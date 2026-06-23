@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import * as XLSX from 'xlsx'
 import { CURRENCIES } from '../../lib/currencies'
+import { compressImage } from '../../lib/imageCompress'
 import './SalesAgent.css'
 
 import storeIcon from '../../assets/icons/store.png'
@@ -178,13 +179,13 @@ ${productLines || 'لا توجد منتجات'}
 
   const emptyProduct = { sku:'', name:'', description:'', price:'', quantity:'', sizes:'', image_url:'', category:'', notes:'', custom_fields:{} }
 
-  function onPickImage(e) {
+  async function onPickImage(e) {
     const f = e.target.files?.[0]; e.target.value = ''
     if (!f) return
-    if (f.size > 2 * 1024 * 1024) return toast.error('الصورة كبيرة (الحد 2MB)')
-    const reader = new FileReader()
-    reader.onload = () => setEditing(p => ({ ...p, image_url: reader.result }))
-    reader.readAsDataURL(f)
+    try {
+      const compressed = await compressImage(f, { maxDim: 600, quality: 0.8 })
+      setEditing(p => ({ ...p, image_url: compressed }))
+    } catch { toast.error('فشل ضغط الصورة') }
   }
 
   async function saveProduct() {

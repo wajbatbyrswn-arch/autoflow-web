@@ -80,6 +80,8 @@ export const dbHandlers = {
 
     const { data: orders30 } = await supabase.from('orders').select('total_amount,status,platform,products_json,created_at').eq('user_id', userId).gte('created_at', since30);
     const all = orders30 || [];
+    // Revenue is counted ONLY after the order is delivered.
+    const delivered = all.filter(o => o.status === 'delivered');
     const notCancelled = all.filter(o => o.status !== 'cancelled');
     const isToday = (d: string) => new Date(d) >= today;
 
@@ -88,10 +90,34 @@ export const dbHandlers = {
       const day = (o.created_at || '').slice(0, 10);
       if (!byDayMap[day]) byDayMap[day] = { count: 0, revenue: 0 };
       byDayMap[day].count++;
-      if (o.status !== 'cancelled') byDayMap[day].revenue += o.total_amount || 0;
+      if (o.status === 'delivered') byDayMap[day].revenue += o.total_amount || 0;
     }
     const platformMap: Record<string, number> = {};
     for (const o of all) platformMap[o.platform || ''] = (platformMap[o.platform || ''] || 0) + 1;
+
+    // Status breakdown for richer reporting
+    const statusMap: Record<string, number> = {};
+    for (const o of all) statusMap[o.status || 'new'] = (statusMap[o.status || 'new'] || 0) + 1;
+
+    // Hourly distribution (peak times) over last 30 days
+    const hourMap: Record<number, number> = {};
+    for (let h = 0; h < 24; h++) hourMap[h] = 0;
+    for (const o of all) {
+      const h = new Date(o.created_at).getHours();
+      hourMap[h] = (hourMap[h] || 0) + 1;
+    }
+
+    // Month-over-month deltas (current 30d vs previous 30d)
+    const since60 = new Date(Date.now() - 60 * 864e5).toISOString();
+    const { data: prevOrders } = await supabase.from('orders')
+      .select('total_amount,status,created_at')
+      .eq('user_id', userId).gte('created_at', since60).lt('created_at', since30);
+    const prev = prevOrders || [];
+    const prevDelivered = prev.filter(o => o.status === 'delivered');
+    const prevRevenue = prevDelivered.reduce((s, o) => s + (o.total_amount || 0), 0);
+    const prevOrdersCount = prev.length;
+    const curRevenue = delivered.reduce((s, o) => s + (o.total_amount || 0), 0);
+    const pct = (cur: number, p: number) => p === 0 ? (cur > 0 ? 100 : 0) : Math.round(((cur - p) / p) * 100);
 
     return {
       messages_today: await count('messages', q => q.gte('created_at', todayIso)),
@@ -99,11 +125,25 @@ export const dbHandlers = {
       orders_total: await count('orders'),
       comments_today: await count('activity_log', q => q.gte('created_at', todayIso)),
       active_conversations: await count('conversations', q => q.eq('status', 'active')),
-      revenue_today: notCancelled.filter(o => isToday(o.created_at)).reduce((s, o) => s + (o.total_amount || 0), 0),
-      revenue_total: notCancelled.reduce((s, o) => s + (o.total_amount || 0), 0),
+      // Revenue = sum of delivered orders' total_amount only.
+      revenue_today: delivered.filter(o => isToday(o.created_at)).reduce((s, o) => s + (o.total_amount || 0), 0),
+      revenue_total: curRevenue,
+      revenue_pending: notCancelled.filter(o => o.status !== 'delivered').reduce((s, o) => s + (o.total_amount || 0), 0),
+      delivered_count: delivered.length,
       orders_by_day: Object.entries(byDayMap).map(([day, v]) => ({ day, count: v.count, revenue: v.revenue })).sort((a, b) => a.day.localeCompare(b.day)),
       platform_distribution: Object.entries(platformMap).map(([platform, count]) => ({ platform, count })),
-      top_products: notCancelled.map(o => ({ products_json: o.products_json })),
+      status_distribution: Object.entries(statusMap).map(([status, count]) => ({ status, count })),
+      hourly_distribution: Object.entries(hourMap).map(([hour, count]) => ({ hour: Number(hour), count })),
+      // Show top products from delivered orders only (real sold items, not pending)
+      top_products: delivered.map(o => ({ products_json: o.products_json })),
+      deltas: {
+        revenue_pct: pct(curRevenue, prevRevenue),
+        orders_pct: pct(all.length, prevOrdersCount),
+        avg_pct: pct(
+          delivered.length > 0 ? curRevenue / delivered.length : 0,
+          prevDelivered.length > 0 ? prevRevenue / prevDelivered.length : 0,
+        ),
+      },
     };
   },
 
@@ -140,14 +180,16 @@ export const dbHandlers = {
     return data || {};
   },
   'db:saveStoreConfig': async ({ userId }: Ctx, c: any) => {
-    await supabase.from('store_config').upsert({
-      user_id: userId, store_name: c.store_name || '', store_description: c.store_description || '',
-      language: c.language || 'ar', work_hours: c.work_hours || '', ai_personality: c.ai_personality || 'friendly',
-      currency: c.currency || 'JOD', contact_phone: c.contact_phone || '', system_prompt: c.system_prompt || '',
-      store_logo: c.store_logo || '',
-      ...(c.product_fields !== undefined ? { product_fields: c.product_fields } : {}),
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'user_id' });
+    // Merge with existing row so partial saves (e.g. only currency) don't erase other fields.
+    const { data: existing } = await supabase.from('store_config').select('*').eq('user_id', userId).single();
+    const FIELDS = ['store_name','store_description','language','work_hours','ai_personality',
+      'currency','contact_phone','system_prompt','store_logo','product_fields'];
+    const next: any = { user_id: userId, updated_at: new Date().toISOString() };
+    for (const f of FIELDS) {
+      if (c[f] !== undefined) next[f] = c[f];
+      else if (existing && existing[f] !== undefined) next[f] = existing[f];
+    }
+    await supabase.from('store_config').upsert(next, { onConflict: 'user_id' });
     return { success: true };
   },
 

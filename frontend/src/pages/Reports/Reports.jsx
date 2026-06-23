@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area, CartesianGrid } from 'recharts'
+import { useCurrency } from '../../lib/useCurrency'
 import trendingIcon from '../../assets/icons/trending.png'
 import revenueIcon from '../../assets/icons/revenue.png'
 import ordersIcon from '../../assets/icons/orders.png'
@@ -12,17 +13,35 @@ import './Reports.css'
 
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
 
+function SummaryRow({ label, value, hint }) {
+  return (
+    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 0', borderBottom:'1px dashed var(--border)'}}>
+      <div>
+        <div style={{fontSize:13, opacity:.75}}>{label}</div>
+        {hint && <div style={{fontSize:10, opacity:.5, marginTop:2}}>{hint}</div>}
+      </div>
+      <div style={{fontWeight:700, fontSize:14, color:'var(--accent2)'}}>{value}</div>
+    </div>
+  )
+}
+
 export default function Reports() {
-  const [stats, setStats] = useState({ 
-    orders_by_day: [], 
-    top_products: [], 
-    messages_today: 0, 
-    orders_today: 0, 
-    orders_total: 0, 
-    revenue_today: 0, 
-    revenue_total: 0, 
+  const currency = useCurrency()
+  const [stats, setStats] = useState({
+    orders_by_day: [],
+    top_products: [],
+    messages_today: 0,
+    orders_today: 0,
+    orders_total: 0,
+    revenue_today: 0,
+    revenue_total: 0,
+    revenue_pending: 0,
+    delivered_count: 0,
     active_conversations: 0,
-    platform_distribution: []
+    platform_distribution: [],
+    status_distribution: [],
+    hourly_distribution: [],
+    deltas: { revenue_pct: 0, orders_pct: 0, avg_pct: 0 },
   })
 
   useEffect(() => { loadStats() }, [])
@@ -41,19 +60,34 @@ export default function Reports() {
   }
 
   const daily = (stats.orders_by_day || []).slice(-30).map(d => ({
-    day: (d.date || '').slice(5),
+    day: (d.day || d.date || '').slice(5),
     orders: d.count || 0,
     revenue: Math.round(d.revenue || 0),
   }))
 
+  const PLATFORM_NAMES = { whatsapp:'واتساب', facebook:'فيسبوك', instagram:'إنستغرام', telegram:'تلغرام' }
   const platformData = (stats.platform_distribution || []).map(p => ({
-    name: p.name === 'whatsapp' ? 'واتساب' : p.name === 'facebook' ? 'فيسبوك' : 'إنستغرام',
-    value: p.value || 0
+    name: PLATFORM_NAMES[p.platform] || p.platform || '—',
+    value: p.count || 0
+  })).filter(p => p.value > 0)
+
+  const STATUS_NAMES = { new:'جديد', preparing:'قيد التجهيز', shipped:'تم الإرسال', delivered:'مُسلَّم', cancelled:'ملغي' }
+  const statusData = (stats.status_distribution || []).map(s => ({
+    name: STATUS_NAMES[s.status] || s.status || '—',
+    value: s.count || 0,
   }))
 
-  // Calculated metrics
-  const avgOrderValue = stats.orders_total > 0 ? Math.round(stats.revenue_total / stats.orders_total) : 0
+  const peakHours = (stats.hourly_distribution || []).map(h => ({
+    hour: `${String(h.hour).padStart(2,'0')}:00`,
+    count: h.count || 0,
+  }))
+
+  // Calculated metrics (avg uses delivered count, not all orders)
+  const avgOrderValue = stats.delivered_count > 0 ? Math.round(stats.revenue_total / stats.delivered_count) : 0
   const conversionRate = stats.messages_today > 0 ? ((stats.orders_today / stats.messages_today) * 100).toFixed(1) : 0
+  const fmtPct = (n) => `${n >= 0 ? '↑' : '↓'} ${Math.abs(n)}%`
+  const trendCls = (n) => n >= 0 ? 'trend-up' : 'trend-down'
+  const d = stats.deltas || { revenue_pct:0, orders_pct:0, avg_pct:0 }
 
   return (
     <div className="reports-container animate-fade">
@@ -72,9 +106,10 @@ export default function Reports() {
             <div className="kpi-icon blue"><img src={revenueIcon} className="kpi-img-icon" /></div>
             <span className="kpi-label">إجمالي الإيرادات</span>
           </div>
-          <div className="kpi-value">{Number(stats.revenue_total || 0).toLocaleString()} <span className="currency">IQD</span></div>
+          <div className="kpi-value">{Number(stats.revenue_total || 0).toLocaleString()} <span className="currency">{currency}</span></div>
           <div className="kpi-footer">
-            <span className="trend-up">↑ 12%</span> منذ الشهر الماضي
+            <span className={trendCls(d.revenue_pct)}>{fmtPct(d.revenue_pct)}</span> منذ الشهر الماضي
+            <div style={{fontSize:11,opacity:.6,marginTop:4}}>قيد التحصيل: {Number(stats.revenue_pending||0).toLocaleString()} {currency}</div>
           </div>
         </div>
 
@@ -85,7 +120,8 @@ export default function Reports() {
           </div>
           <div className="kpi-value">{stats.orders_total}</div>
           <div className="kpi-footer">
-            <span className="trend-up">↑ 8%</span> منذ الشهر الماضي
+            <span className={trendCls(d.orders_pct)}>{fmtPct(d.orders_pct)}</span> منذ الشهر الماضي
+            <div style={{fontSize:11,opacity:.6,marginTop:4}}>مُسلَّمة: {stats.delivered_count}</div>
           </div>
         </div>
 
@@ -96,7 +132,7 @@ export default function Reports() {
           </div>
           <div className="kpi-value">{conversionRate}%</div>
           <div className="kpi-footer">
-            <span className="trend-down">↓ 2%</span> منذ الشهر الماضي
+            رسائل اليوم: {stats.messages_today}
           </div>
         </div>
 
@@ -105,9 +141,9 @@ export default function Reports() {
             <div className="kpi-icon orange"><img src={revenueIcon} className="kpi-img-icon" /></div>
             <span className="kpi-label">متوسط قيمة الطلب</span>
           </div>
-          <div className="kpi-value">{avgOrderValue.toLocaleString()} <span className="currency">IQD</span></div>
+          <div className="kpi-value">{avgOrderValue.toLocaleString()} <span className="currency">{currency}</span></div>
           <div className="kpi-footer">
-            <span className="trend-up">↑ 5%</span> منذ الشهر الماضي
+            <span className={trendCls(d.avg_pct)}>{fmtPct(d.avg_pct)}</span> منذ الشهر الماضي
           </div>
         </div>
       </div>
@@ -209,14 +245,63 @@ export default function Reports() {
           <div className="chart-header">
             <div className="chart-title-group">
               <img src={clockIcon} className="chart-title-img" />
-              <span className="chart-title">أوقات الذروة</span>
+              <span className="chart-title">أوقات الذروة (آخر 30 يوم)</span>
             </div>
           </div>
-          <div className="peak-times-visual">
-            <div className="empty-state">سيتم تحليل أوقات الذروة بناءً على نشاط الرسائل والطلبات قريباً.</div>
+          <div className="chart-body" style={{ height: 220 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={peakHours}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-light)" />
+                <XAxis dataKey="hour" interval={2} tick={{fill:'var(--text-muted)', fontSize: 10}} axisLine={false} tickLine={false} />
+                <YAxis allowDecimals={false} tick={{fill:'var(--text-muted)', fontSize: 10}} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={{background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:12}} />
+                <Bar dataKey="count" name="طلبات" fill="#f59e0b" radius={[6,6,0,0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
       </div>
+
+      {/* Status breakdown */}
+      {statusData.some(s => s.value > 0) && (
+        <div className="reports-grid grid-2">
+          <div className="card detail-card">
+            <div className="chart-header">
+              <div className="chart-title-group">
+                <img src={ordersIcon} className="chart-title-img" />
+                <span className="chart-title">توزيع حالات الطلبات</span>
+              </div>
+            </div>
+            <div className="chart-body" style={{ height: 240 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={statusData} cx="50%" cy="50%" outerRadius={85} dataKey="value" label={(e) => `${e.name}: ${e.value}`}>
+                    {statusData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="card detail-card">
+            <div className="chart-header">
+              <div className="chart-title-group">
+                <img src={revenueIcon} className="chart-title-img" />
+                <span className="chart-title">ملخص الأداء</span>
+              </div>
+            </div>
+            <div style={{padding:'10px 6px', display:'flex', flexDirection:'column', gap:14}}>
+              <SummaryRow label="إيرادات اليوم" value={`${Number(stats.revenue_today||0).toLocaleString()} ${currency}`} />
+              <SummaryRow label="إيرادات قيد التحصيل" value={`${Number(stats.revenue_pending||0).toLocaleString()} ${currency}`} hint="طلبات لم تُسلَّم بعد" />
+              <SummaryRow label="طلبات اليوم" value={String(stats.orders_today||0)} />
+              <SummaryRow label="رسائل اليوم" value={String(stats.messages_today||0)} />
+              <SummaryRow label="المحادثات النشطة" value={String(stats.active_conversations||0)} />
+              <SummaryRow label="معدل الإتمام" value={`${stats.orders_total ? Math.round((stats.delivered_count/stats.orders_total)*100) : 0}%`} hint="مُسلَّم ÷ إجمالي" />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
