@@ -78,11 +78,9 @@ function Gate() {
     </Screen>
   )
 
-  if (sub.subscription_status !== 'active') {
-    return <Activate onActivated={() => rpc('activation:status').then(setSub)} />
-  }
-
-  return <App profile={sub} />
+  // Inactive users still enter the app in preview mode (read-only),
+  // with a top banner + locked actions. They click "اشترك" to open Plans/Activate.
+  return <App profile={sub} onSubscriptionChange={() => rpc('activation:status').then(setSub)} />
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(

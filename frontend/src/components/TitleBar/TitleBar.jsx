@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
-import { Bell, Sun, Moon, Calendar, LogOut } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Bell, Sun, Moon, Calendar, LogOut, Sparkles } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
 import './TitleBar.css'
 
-export default function TitleBar({ theme, toggleTheme }) {
+export default function TitleBar({ theme, toggleTheme, isActive = true }) {
   const logout = async () => { await supabase.auth.signOut(); location.reload() }
+  const nav = useNavigate()
 
   const [now, setNow] = useState(new Date())
   const [storeName, setStoreName] = useState('AutoFlow')
@@ -36,6 +38,14 @@ export default function TitleBar({ theme, toggleTheme }) {
 
       <div className="header-right-content">
         <div className="header-actions">
+          {!isActive && (
+            <button
+              onClick={() => nav('/plans')}
+              style={{display:'inline-flex', alignItems:'center', gap:6, background:'linear-gradient(90deg,#6C47FF,#a855f7)', color:'#fff', border:'none', borderRadius:10, padding:'8px 18px', fontWeight:800, cursor:'pointer', fontFamily:'inherit', fontSize:13, boxShadow:'0 6px 18px -8px #6C47FF'}}>
+              <Sparkles size={14} /> اشترك
+            </button>
+          )}
+
           <div className="datetime-display">
             <Calendar size={14} />
             <span>{dateStr}</span>

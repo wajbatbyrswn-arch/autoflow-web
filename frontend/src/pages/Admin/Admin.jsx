@@ -74,13 +74,22 @@ export default function Admin() {
         <h2 style={h2}>المستخدمون ({users.length})</h2>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
           <thead><tr style={{ textAlign: 'right', opacity: .7 }}>
-            <th style={th}>المتجر</th><th style={th}>الحالة</th><th style={th}>الشركة (الموديل)</th><th style={th}>الاشتراك</th><th style={th}>صفحات ناشر (الفصل)</th><th style={th}>ربط ناشر (Webhook + Business)</th>
+            <th style={th}>المتجر</th><th style={th}>ID</th><th style={th}>الحالة</th><th style={th}>الموديل</th><th style={th}>الانتهاء</th><th style={th}>تلغرام (توكن)</th><th style={th}>صفحات ناشر</th><th style={th}>Webhook + Business</th>
           </tr></thead>
           <tbody>
             {users.map(u => (
               <tr key={u.user_id} style={{ borderTop: '1px solid var(--border-color,#2a2e37)' }}>
                 <td style={td}>{u.full_name || u.email || u.user_id.slice(0, 8)}</td>
-                <td style={td}>{STATUS[u.subscription_status] || u.subscription_status}</td>
+                <td style={{ ...td, fontFamily:'monospace', fontSize:11, opacity:.6 }}>
+                  <span style={{cursor:'pointer'}} title={u.user_id} onClick={()=>{ navigator.clipboard.writeText(u.user_id); toast.success('نُسخ الـ ID') }}>
+                    {u.user_id.slice(0,8)}
+                  </span>
+                </td>
+                <td style={td}>
+                  <select value={u.subscription_status} onChange={e => updateUser(u.user_id, { subscription_status: e.target.value })} style={sel}>
+                    <option value="active">نشط</option><option value="inactive">غير نشط</option><option value="expired">منتهي</option>
+                  </select>
+                </td>
                 <td style={td}>
                   <select value={u.ai_provider || ''} onChange={e => updateUser(u.user_id, { ai_provider: e.target.value })} style={sel}>
                     <option value="">⭐ الافتراضي ({PROVIDER_LABELS[aiActive] || aiActive})</option>
@@ -90,9 +99,16 @@ export default function Admin() {
                   </select>
                 </td>
                 <td style={td}>
-                  <select value={u.subscription_status} onChange={e => updateUser(u.user_id, { subscription_status: e.target.value })} style={sel}>
-                    <option value="active">نشط</option><option value="inactive">غير نشط</option><option value="expired">منتهي</option>
-                  </select>
+                  <input type="date" defaultValue={(u.subscription_expires_at || '').slice(0,10)}
+                    onBlur={e => { const v = e.target.value; if (v !== (u.subscription_expires_at||'').slice(0,10)) updateUser(u.user_id, { subscription_expires_at: v ? new Date(v).toISOString() : null }) }}
+                    style={{ ...sel, fontSize: 12 }} />
+                </td>
+                <td style={{ ...td, minWidth: 220 }}>
+                  <input dir="ltr" placeholder="123456:ABC..."
+                    defaultValue={u.telegram_bot_token || ''}
+                    onBlur={e => { if (e.target.value !== (u.telegram_bot_token||'')) updateUser(u.user_id, { telegram_bot_token: e.target.value.trim() }) }}
+                    style={{ ...sel, width: '100%', fontSize: 11, fontFamily:'monospace' }} />
+                  <div style={{ fontSize: 10, opacity: .5, marginTop: 2 }}>توكن بوت تلغرام للمستخدم</div>
                 </td>
                 <td style={td}>
                   <select multiple value={(u.nashir_account_ids || []).map(String)} style={{ ...sel, minWidth: 180, minHeight: 64 }}
@@ -104,9 +120,9 @@ export default function Admin() {
                       <option key={a.pageId} value={a.pageId}>{a.platform === 'instagram' ? '📸' : '📘'} {a.pageName}</option>
                     ))}
                   </select>
-                  <div style={{ fontSize: 10, opacity: .5, marginTop: 2 }}>اتركه فارغاً = كل الرسائل (تجربة)</div>
+                  <div style={{ fontSize: 10, opacity: .5, marginTop: 2 }}>اتركه فارغاً = كل الرسائل</div>
                 </td>
-                <td style={{ ...td, minWidth: 280 }}>
+                <td style={{ ...td, minWidth: 260 }}>
                   <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
                     <input dir="ltr" readOnly value={`${BACKEND_URL}/api/nashir/webhook/${u.nashir_webhook_token || ''}`}
                       style={{ ...sel, flex: 1, fontSize: 11, fontFamily: 'monospace' }}
@@ -133,7 +149,7 @@ const h2 = { fontSize: 16, fontWeight: 700, marginBottom: 14 }
 const lbl = { display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, opacity: .8 }
 const inp = { padding: 8, borderRadius: 10, border: '1px solid var(--border-color,#2a2e37)', background: 'var(--bg-main,#0f1115)', color: 'inherit', width: 110 }
 const btn = { background: 'var(--accent,#6C47FF)', color: '#fff', border: 'none', borderRadius: 10, padding: '9px 22px', fontWeight: 700, cursor: 'pointer' }
-const chip = { fontFamily: 'monospace', padding: '8px 14px', borderRadius: 10, border: '1px solid var(--border-color,#2a2e37)', background: 'transparent', color: 'inherit', cursor: 'pointer' }
+const chip = { fontFamily: 'monospace', padding: '8px 14px', borderRadius: 10, border: '1px solid var(--border-color,#2a2e37)', background: 'transparent', color: 'inherit', cursor: 'pointer', fontSize: 11, wordBreak: 'break-all', maxWidth: 280 }
 const th = { padding: '8px 6px' }
 const td = { padding: '10px 6px' }
 const sel = { padding: 6, borderRadius: 8, border: '1px solid var(--border-color,#2a2e37)', background: 'var(--bg-main,#0f1115)', color: 'inherit' }

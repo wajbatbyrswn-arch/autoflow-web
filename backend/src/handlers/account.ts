@@ -28,9 +28,16 @@ async function requireAdmin(userId: string) {
 export const accountHandlers = {
   'activation:status': async ({ userId }: Ctx) => {
     await ensureProfile(userId);
-    const { data: profile } = await supabase.from('user_profiles')
-      .select('subscription_status, subscription_expires_at, plan, is_admin, ai_model, store_id:user_id')
+    // Try the new-schema select; fall back if telegram_bot_token column doesn't exist yet.
+    let { data: profile, error } = await supabase.from('user_profiles')
+      .select('user_id, email, full_name, subscription_status, subscription_expires_at, plan, is_admin, ai_model, nashir_account_ids, telegram_bot_token, store_id:user_id')
       .eq('user_id', userId).single();
+    if (error) {
+      const fallback = await supabase.from('user_profiles')
+        .select('user_id, email, full_name, subscription_status, subscription_expires_at, plan, is_admin, ai_model, nashir_account_ids, store_id:user_id')
+        .eq('user_id', userId).single();
+      profile = fallback.data as any;
+    }
 
     if (profile?.subscription_status === 'active' && profile.subscription_expires_at) {
       if (new Date(profile.subscription_expires_at) < new Date()) {
@@ -42,7 +49,8 @@ export const accountHandlers = {
   },
 
   'activation:activate': async ({ userId }: Ctx, { code }: any) => {
-    const clean = String(code || '').trim().toUpperCase();
+    // Keep original case — codes mix upper+lower letters and symbols.
+    const clean = String(code || '').trim();
     const { data: ac } = await supabase.from('activation_codes').select('*').eq('code', clean).is('used_by', null).single();
     if (!ac) throw new Error('كود غير صحيح أو مستخدم مسبقاً');
 
@@ -58,7 +66,15 @@ export const accountHandlers = {
   // ---- Admin ----
   'admin:generateCodes': async ({ userId }: Ctx, { duration_days = 30, count = 1 }: any) => {
     await requireAdmin(userId);
-    const codes = Array.from({ length: Math.min(Number(count) || 1, 50) }, () => crypto.randomBytes(4).toString('hex').toUpperCase());
+    // 20-char activation codes mixing upper/lower letters, digits, and url-safe symbols.
+    const ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%&*';
+    const makeCode = () => {
+      const bytes = crypto.randomBytes(20);
+      let out = '';
+      for (let i = 0; i < 20; i++) out += ALPHA[bytes[i] % ALPHA.length];
+      return out;
+    };
+    const codes = Array.from({ length: Math.min(Number(count) || 1, 50) }, makeCode);
     const { data } = await supabase.from('activation_codes').insert(codes.map(code => ({ code, duration_days }))).select();
     return data;
   },
@@ -81,7 +97,7 @@ export const accountHandlers = {
     }
     return users;
   },
-  'admin:updateUser': async ({ userId }: Ctx, { target_user_id, ai_model, ai_provider, subscription_status, is_admin, nashir_account_ids, nashir_business_id }: any) => {
+  'admin:updateUser': async ({ userId }: Ctx, { target_user_id, ai_model, ai_provider, subscription_status, is_admin, nashir_account_ids, nashir_business_id, telegram_bot_token, plan, subscription_expires_at }: any) => {
     await requireAdmin(userId);
     const updates: Record<string, unknown> = {};
     if (ai_model !== undefined) updates.ai_model = ai_model;
@@ -94,6 +110,9 @@ export const accountHandlers = {
         : [];
     }
     if (nashir_business_id !== undefined) updates.nashir_business_id = String(nashir_business_id || '');
+    if (telegram_bot_token !== undefined) updates.telegram_bot_token = String(telegram_bot_token || '');
+    if (plan !== undefined) updates.plan = String(plan || 'basic');
+    if (subscription_expires_at !== undefined) updates.subscription_expires_at = subscription_expires_at || null;
     const { data } = await supabase.from('user_profiles').update(updates).eq('user_id', target_user_id).select().single();
     return data;
   },

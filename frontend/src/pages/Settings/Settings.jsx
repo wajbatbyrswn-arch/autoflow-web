@@ -12,13 +12,17 @@ import saveIcon from '../../assets/icons/save.png'
 import { CURRENCIES } from '../../lib/currencies'
 import { compressImage } from '../../lib/imageCompress'
 import { refreshCurrency } from '../../lib/useCurrency'
+import { useSubscription } from '../../lib/subscription'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import Activate from '../../auth/Activate'
 import './Settings.css'
 
 const TABS = [
   { id: 0, label: 'المنصات', icon: globeIcon },
   { id: 1, label: 'الملف الشخصي', icon: profileIcon },
-  { id: 2, label: 'الإشعارات', icon: bellIcon },
-  { id: 3, label: 'النظام', icon: monitorIcon },
+  { id: 2, label: 'تنشيط الحساب', icon: saveIcon },
+  { id: 3, label: 'الإشعارات', icon: bellIcon },
+  { id: 4, label: 'النظام', icon: monitorIcon },
 ]
 
 // Platform cards for the Nashir-based connection grid.
@@ -30,7 +34,11 @@ const PLATFORM_CARDS = [
 ]
 
 export default function Settings() {
-  const [tab, setTab] = useState(0)
+  const nav = useNavigate()
+  const [searchParams] = useSearchParams()
+  const { profile, refresh: refreshSub } = useSubscription()
+  const initialTab = searchParams.get('tab') === 'billing' ? 2 : 0
+  const [tab, setTab] = useState(initialTab)
 
   // ── Nashir platform connections ──────────────────────────────────────────
   const [nashirState, setNashirState] = useState(null)
@@ -390,92 +398,106 @@ export default function Settings() {
 
       <div className="settings-content">
 
-        {/* ── Tab 0: Platforms (via Nashir) ── */}
+        {/* ── Tab 0: Platforms (owner-managed) ── */}
         {tab === 0 && (
           <div className="animate-fade">
-
-            {/* Nashir API key */}
-            <div className="card" style={{marginBottom:20}}>
-              <div className="card-title">ربط منصة ناشر</div>
-              <p style={{fontSize:13,color:'var(--text-muted)',marginBottom:14}}>
-                AutoFlow يربط حساباتك الاجتماعية عبر منصة <b>ناشر</b>. أدخل مفتاح API الخاص بك (يبدأ بـ up_) من
-                {' '}<a href="#" style={{color:'var(--accent,#6C47FF)'}} onClick={e=>{e.preventDefault();window.open('https://nashir.ai/dashboard/settings','_blank','noopener')}}>إعدادات ناشر → API Keys</a>.
-              </p>
-              <div style={{display:'flex',gap:8,alignItems:'flex-end'}}>
-                <div className="input-group" style={{flex:1,marginBottom:0}}>
-                  <label className="input-label">Nashir API Key</label>
-                  <input type="password" className="input" value={nashirKeyInput} onChange={e=>setNashirKeyInput(e.target.value)} placeholder="up_..." />
-                </div>
-                <button className="btn btn-primary" onClick={saveNashirKey} disabled={nashirSaving}>
-                  {nashirSaving ? 'جارٍ الحفظ...' : 'حفظ وتحقق'}
-                </button>
+            <div className="card" style={{marginBottom:20, background:'linear-gradient(135deg, rgba(108,71,255,0.08), rgba(168,85,247,0.05))', border:'1px solid var(--accent)'}}>
+              <div style={{display:'flex', alignItems:'center', gap:12, marginBottom:6}}>
+                <div style={{width:40, height:40, borderRadius:10, background:'var(--accent)', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:20}}>🔗</div>
+                <div className="card-title" style={{margin:0}}>كيف يتم ربط الحسابات؟</div>
               </div>
-              {nashirState?.usingOwnerKey && (
-                <div style={{marginTop:10,fontSize:12,color:'var(--text-muted)'}}>تستخدم حالياً المفتاح الافتراضي للنظام. أدخل مفتاحك الخاص لفصل حساباتك.</div>
-              )}
-              {nashirState?.error && (
-                <div style={{marginTop:10,fontSize:12,color:'#ff6b6b'}}>{nashirState.error}</div>
-              )}
+              <p style={{fontSize:13, color:'var(--text-secondary)', lineHeight:1.8, margin:0}}>
+                لتسهيل التجربة عليك، <b>فريق AutoFlow يربط حساباتك</b> (فيسبوك، إنستغرام، واتساب) خلال 10 دقائق بعد التواصل معنا.
+                ما عليك سوى الضغط على زر <b>(تواصل لربط الحساب)</b> أدناه. أما <b>تلغرام</b> فيمكنك ربطه بنفسك بسهولة، أو يمكن للفريق ربطه لك.
+              </p>
+              <button className="btn btn-primary" style={{marginTop:14}} onClick={()=>nav('/contact')}>
+                تواصل معنا لربط الحسابات
+              </button>
             </div>
 
-            {/* Connected platforms grid */}
             <div className="card">
-              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
-                <div className="card-title" style={{marginBottom:0}}>الحسابات المربوطة</div>
-                <button className="btn btn-sm" style={{background:'var(--glass-bg)',border:'1px solid var(--border-color)'}} onClick={loadNashir} disabled={nashirLoading}>
-                  {nashirLoading ? 'تحديث...' : '↻ تحديث'}
-                </button>
-              </div>
-              <p style={{fontSize:13,color:'var(--text-muted)',marginBottom:18}}>اربط حساباتك الاجتماعية عبر ناشر لاستقبال الرسائل والرد الذكي.</p>
+              <div className="card-title">حالة الحسابات المربوطة</div>
+              <p style={{fontSize:13,color:'var(--text-muted)',marginBottom:18}}>
+                سيظهر هنا تلقائياً أي حساب يربطه الفريق لك، أو تربطه بنفسك (تلغرام).
+              </p>
 
               <div className="settings-grid">
                 {PLATFORM_CARDS.map(pc => {
-                  const accounts = nashirState?.platforms?.[pc.key] || []
-                  const connected = accounts.length > 0
+                  let connected = false
+                  let info = ''
+                  if (pc.key === 'telegram') {
+                    connected = !!profile?.telegram_bot_token
+                    info = connected ? 'بوت تلغرام مفعّل' : ''
+                  } else {
+                    const accounts = nashirState?.platforms?.[pc.key] || []
+                    const adminLinked = (profile?.nashir_account_ids || []).length > 0
+                    connected = accounts.length > 0 || (adminLinked && (pc.key === 'facebook' || pc.key === 'instagram' || pc.key === 'whatsapp'))
+                    if (accounts.length) info = accounts.map(a => a.pageName || a.page_name || a.username || '—').join('، ')
+                    else if (connected) info = 'تم الربط من قبل الفريق ✓'
+                  }
                   return (
-                    <div key={pc.key} className="card platform-settings-card" style={{boxShadow:'none',border:'1px solid var(--border-color)'}}>
+                    <div key={pc.key} className="card platform-settings-card" style={{boxShadow:'none', border:`1px solid ${connected ? '#10b981' : 'var(--border-color)'}`}}>
                       <div className="platform-settings-header">
                         <div className="flex items-center gap-3">
                           <img src={pc.icon} className="platform-settings-img" />
                           <div>
-                            <div style={{fontWeight:700,fontSize:15}}>{pc.label}</div>
-                            <div style={{fontSize:12,color:'var(--text-muted)'}}>{pc.sub}</div>
+                            <div style={{fontWeight:700, fontSize:15}}>{pc.label}</div>
+                            <div style={{fontSize:12, color:'var(--text-muted)'}}>{pc.sub}</div>
                           </div>
                         </div>
-                        <span className={`badge ${connected?'badge-success badge-dot':'badge-danger badge-dot'}`}>
-                          {connected ? 'مربوط' : 'غير مربوط'}
+                        <span className={`badge ${connected ? 'badge-success badge-dot' : 'badge-danger badge-dot'}`}>
+                          {connected ? 'مربوط ✓' : 'غير مربوط'}
                         </span>
                       </div>
                       <div className="divider" />
-                      {pc.viaNashir ? (
-                        <>
-                          {connected ? (
-                            <div style={{display:'flex',flexDirection:'column',gap:6,marginBottom:12}}>
-                              {accounts.map(a => (
-                                <div key={a.id} style={{fontSize:13,display:'flex',alignItems:'center',gap:6}}>
-                                  <span style={{color:'#34d399'}}>✓</span>
-                                  <span>{a.pageName || a.page_name || a.username || '—'}</span>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div style={{fontSize:12,color:'var(--text-muted)',marginBottom:12}}>لا يوجد حساب مربوط بعد.</div>
-                          )}
-                          <button className="btn btn-primary btn-sm w-full"
-                            onClick={()=>window.open((nashirState?.dashboardUrl||'https://nashir.ai/dashboard'),'_blank','noopener')}>
-                            {connected ? 'إدارة عبر ناشر' : `ربط ${pc.label} عبر ناشر`}
-                          </button>
-                        </>
-                      ) : (
-                        <div style={{fontSize:12,color:'var(--text-muted)'}}>
-                          {pc.soon}
+                      {connected ? (
+                        <div style={{fontSize:13, color:'#34d399', marginBottom:12, lineHeight:1.7}}>{info}</div>
+                      ) : pc.key === 'telegram' ? (
+                        <div style={{fontSize:12, color:'var(--text-muted)', marginBottom:12}}>
+                          أدخل توكن البوت من <a href="https://t.me/BotFather" target="_blank" rel="noreferrer" style={{color:'var(--accent)'}}>@BotFather</a> أو اطلب من الفريق ربطه لك.
                         </div>
+                      ) : (
+                        <div style={{fontSize:12, color:'var(--text-muted)', marginBottom:12}}>لم يُربط بعد. تواصل معنا لربط الحساب خلال 10 دقائق.</div>
+                      )}
+                      {pc.key === 'telegram' && !connected ? (
+                        <div style={{display:'flex', gap:6}}>
+                          <input type="text" className="input" value={tgToken} onChange={e=>setTgToken(e.target.value)} placeholder="123456:ABC..." style={{flex:1, fontSize:12}} dir="ltr" />
+                          <button className="btn btn-primary btn-sm" onClick={connectTG} disabled={tgConnecting || !tgToken}>
+                            {tgConnecting ? '...' : 'ربط'}
+                          </button>
+                        </div>
+                      ) : (
+                        <button className="btn btn-primary btn-sm w-full" onClick={()=>nav('/contact')}>
+                          {connected ? 'إدارة عبر الفريق' : 'تواصل لربط الحساب'}
+                        </button>
                       )}
                     </div>
                   )
                 })}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* ── Tab 2: Activation / Billing ── */}
+        {tab === 2 && (
+          <div className="animate-fade" style={{display:'flex', justifyContent:'center'}}>
+            {profile?.subscription_status === 'active' ? (
+              <div className="card" style={{padding:30, maxWidth:520, textAlign:'center'}}>
+                <div style={{fontSize:48, marginBottom:10}}>✓</div>
+                <h2 style={{fontSize:22, fontWeight:800, marginBottom:10}}>اشتراكك مُفعّل</h2>
+                <p style={{color:'var(--text-secondary)', marginBottom:18}}>
+                  الخطة: <strong>{profile?.plan === 'basic' ? 'الخطة الشهرية' : profile?.plan}</strong>
+                  <br/>
+                  {profile?.subscription_expires_at && (
+                    <>ينتهي بتاريخ <strong>{new Date(profile.subscription_expires_at).toLocaleDateString('ar-EG', { dateStyle:'long' })}</strong></>
+                  )}
+                </p>
+                <button className="btn btn-secondary" onClick={()=>nav('/contact')}>تواصل للتجديد</button>
+              </div>
+            ) : (
+              <Activate embedded onActivated={() => { refreshSub?.(); toast.success('تم التفعيل ✓') }} />
+            )}
           </div>
         )}
 
@@ -525,8 +547,8 @@ export default function Settings() {
           </div>
         )}
 
-        {/* ── Tab 2: Notifications ── */}
-        {tab === 2 && (
+        {/* ── Tab 3: Notifications ── */}
+        {tab === 3 && (
           <div className="card animate-fade">
             <div className="card-title">إعدادات الإشعارات وتنبيهات الإدارة</div>
             <div className="input-group" style={{marginBottom:20}}>
@@ -576,8 +598,8 @@ export default function Settings() {
           </div>
         )}
 
-        {/* ── Tab 3: System ── */}
-        {tab === 3 && (
+        {/* ── Tab 4: System ── */}
+        {tab === 4 && (
           <div className="card animate-fade">
             <div className="card-title">النظام</div>
             <div className="system-info">

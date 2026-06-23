@@ -29,9 +29,18 @@ const NAV_TOOLS = [
   { to: '/reports', icon: reportsIcon, label: 'التقارير', isImage: true },
   { to: '/notifications', icon: bellIcon, label: 'الإشعارات', isImage: true },
   { to: '/settings', icon: settingsIcon, label: 'الإعدادات', isImage: true },
+  { to: '/contact', icon: MessageCircle, label: 'تواصل معنا', isImage: false },
+  { to: '/plans', icon: Sparkles, label: 'الخطط والأسعار', isImage: false },
 ]
 
-export default function Sidebar({ isAdmin }) {
+function planLabel(status, plan, expires) {
+  if (status === 'expired') return { txt: 'منتهي', cls: 'expired' }
+  if (status !== 'active') return { txt: 'غير مفعّل', cls: 'inactive' }
+  const days = expires ? Math.max(0, Math.ceil((new Date(expires) - new Date()) / 86400000)) : null
+  return { txt: `${plan === 'basic' ? 'الخطة الشهرية' : (plan || 'مفعّل')}${days != null ? ` — ${days} يوم` : ''}`, cls: 'active' }
+}
+
+export default function Sidebar({ isAdmin, profile = null }) {
   const [storeInfo, setStoreInfo] = useState({ store_name: 'AutoFlow', store_logo: '' })
 
   useEffect(() => {
@@ -117,11 +126,24 @@ export default function Sidebar({ isAdmin }) {
           </div>
           <div className="profile-info">
             <div className="profile-name">{storeInfo.store_name}</div>
-            <div className="profile-plan">
-              خطـة بـرو
+            <div className="profile-plan" style={{
+              color: profile?.subscription_status === 'active' ? '#34d399'
+                   : profile?.subscription_status === 'expired' ? '#f87171' : '#fbbf24'
+            }}>
+              {planLabel(profile?.subscription_status, profile?.plan, profile?.subscription_expires_at).txt}
             </div>
+            {profile?.subscription_status === 'active' && profile?.subscription_expires_at && (
+              <div style={{fontSize:10, opacity:.55, marginTop:2}}>
+                ينتهي {new Date(profile.subscription_expires_at).toLocaleDateString('ar-EG', { day:'numeric', month:'short', year:'numeric' })}
+              </div>
+            )}
           </div>
         </div>
+        {profile?.user_id && (
+          <div style={{fontSize:10, opacity:.5, padding:'4px 8px', fontFamily:'monospace', direction:'ltr', textAlign:'center'}}>
+            ID: {String(profile.user_id).slice(0, 8)}
+          </div>
+        )}
         <div className="version-badge">v1.0.0</div>
       </div>
     </aside>
