@@ -492,6 +492,21 @@ export default function Landing() {
   const [active, setActive] = useState('home')
   const ActiveTab = TAB_COMPONENTS[active] || HomeTab
 
+  // The app's global CSS sets html/body/#root to overflow:hidden for the
+  // in-app dashboard layout. The landing needs to scroll, so we toggle a
+  // class on mount and clear it on unmount.
+  useEffect(() => {
+    document.documentElement.classList.add('landing-mode')
+    document.body.classList.add('landing-mode')
+    const root = document.getElementById('root')
+    if (root) root.classList.add('landing-mode')
+    return () => {
+      document.documentElement.classList.remove('landing-mode')
+      document.body.classList.remove('landing-mode')
+      if (root) root.classList.remove('landing-mode')
+    }
+  }, [])
+
   useEffect(() => {
     // Scroll to top when tab changes for a clean section reveal.
     window.scrollTo({ top: 0, behavior: 'smooth' })
