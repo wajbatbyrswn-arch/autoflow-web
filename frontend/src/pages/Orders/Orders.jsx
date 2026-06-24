@@ -7,6 +7,7 @@ import instagramIcon from '../../assets/icons/instagram.png'
 import telegramIcon from '../../assets/icons/telegram.png'
 import excelIcon from '../../assets/icons/excel.png'
 import { useCurrency } from '../../lib/useCurrency'
+import Invoice from './Invoice'
 
 const STATUSES = [
   { v:'new', l:'جديد', cls:'badge-info' },
@@ -22,6 +23,7 @@ export default function Orders() {
   const [orders, setOrders] = useState([])
   const [selected, setSelected] = useState(null)
   const [filter, setFilter] = useState({ status:'', platform:'' })
+  const [printing, setPrinting] = useState(null)
   const currency = useCurrency()
 
   useEffect(() => { loadOrders() }, [filter])
@@ -102,12 +104,17 @@ export default function Orders() {
                     </select>
                   </td>
                   <td style={{fontSize:11,color:'var(--text-muted)'}}>{new Date(o.created_at).toLocaleDateString('ar')}</td>
-                  <td><button className="btn btn-secondary btn-sm" onClick={e=>{e.stopPropagation();setSelected(o)}}>👁</button></td>
+                  <td onClick={e=>e.stopPropagation()} style={{display:'flex', gap:4}}>
+                    <button className="btn btn-secondary btn-sm" title="عرض" onClick={()=>setSelected(o)}>👁</button>
+                    <button className="btn btn-secondary btn-sm" title="طباعة" onClick={()=>setPrinting(o)}>🖨️</button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+
+        {printing && <Invoice order={printing} currency={currency} onClose={()=>setPrinting(null)} />}
 
         {selected && (
           <div className="order-detail card animate-fade">
@@ -131,6 +138,10 @@ export default function Orders() {
             ))}
             <div className="divider" />
             <div className="detail-row"><span>المبلغ الكلي</span><strong style={{color:'var(--accent2)',fontSize:16}}>{Number(selected.total_amount||0).toLocaleString()} {currency}</strong></div>
+            <button className="btn btn-primary flex-center" style={{marginTop:14, width:'100%', background:'linear-gradient(95deg,#1B3A8C,#2BB24C)', border:'none'}}
+              onClick={()=>setPrinting(selected)}>
+              🖨️ طباعة الفاتورة (PDF)
+            </button>
             <div style={{fontWeight:600,marginBottom:8,fontSize:13,marginTop:16}}>تحديث الحالة:</div>
             <div className="status-btns">
               {STATUSES.map(s => (
