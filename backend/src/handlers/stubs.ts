@@ -11,10 +11,10 @@ export const stubHandlers = {
   'whatsapp:getStatus': async () => ({ connected: false, status: 'disconnected' }),
   'whatsapp:sendMessage': notReady('واتساب'),
 
-  // Telegram (to be implemented with bot API on the backend)
-  'telegram:connect': notReady('تلغرام'),
+  // Telegram: real bot API integration lives in notifications.ts
+  // (telegram:saveToken / telegram:getStatus / telegram:sendTest).
+  // We keep these old shim channels as no-ops for backward compatibility.
   'telegram:disconnect': async () => ({ success: true }),
-  'telegram:getStatus': async () => ({ connected: false }),
   'telegram:sendMessage': notReady('تلغرام'),
 
   // Webhook server: not needed on web (Nashir handles inbound); report stopped.

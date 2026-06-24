@@ -115,4 +115,56 @@ export const notificationsHandlers = {
       .eq('user_id', userId);
     return { success: true };
   },
+
+  // ---- Telegram bot wiring (replaces the broken stub) ----
+  'telegram:saveToken': async ({ userId }: Ctx, { token }: any) => {
+    const clean = String(token || '').trim();
+    if (!clean) {
+      await supabase.from('user_profiles').update({ telegram_bot_token: '' }).eq('user_id', userId);
+      return { success: true };
+    }
+    // Verify the token works (getMe)
+    try {
+      const res = await axios.get(`https://api.telegram.org/bot${clean}/getMe`, { timeout: 6000 });
+      if (!res.data?.ok) throw new Error('Invalid token');
+      await supabase.from('user_profiles').update({ telegram_bot_token: clean }).eq('user_id', userId);
+      return { success: true, bot: res.data.result };
+    } catch (e: any) {
+      const msg = e?.response?.data?.description || e?.message || 'فشل التحقق من التوكن';
+      return { success: false, error: msg };
+    }
+  },
+
+  'telegram:getStatus': async ({ userId }: Ctx) => {
+    const { data } = await supabase.from('user_profiles')
+      .select('telegram_bot_token, admin_telegram_chat_id').eq('user_id', userId).single();
+    const token = data?.telegram_bot_token;
+    const chatId = data?.admin_telegram_chat_id;
+    if (!token) return { status: 'disconnected', has_token: false, has_chat: !!chatId };
+    try {
+      const res = await axios.get(`https://api.telegram.org/bot${token}/getMe`, { timeout: 5000 });
+      return { status: 'connected', has_token: true, has_chat: !!chatId, bot: res.data?.result };
+    } catch {
+      return { status: 'token_invalid', has_token: true, has_chat: !!chatId };
+    }
+  },
+
+  'telegram:sendTest': async ({ userId }: Ctx) => {
+    const { data } = await supabase.from('user_profiles')
+      .select('telegram_bot_token, admin_telegram_chat_id, full_name, email').eq('user_id', userId).single();
+    const token = data?.telegram_bot_token;
+    const chatId = data?.admin_telegram_chat_id;
+    if (!token) return { success: false, error: 'لم يتم حفظ توكن البوت' };
+    if (!chatId) return { success: false, error: 'لم يتم تحديد Chat ID للقناة/الجروب' };
+    const text = `✅ *AutoFlow Chat — اختبار اتصال*\n\nمرحباً ${data?.full_name || data?.email || ''}.\nالبوت متصل وجاهز لإرسال إشعارات الطلبات والشكاوى إلى هذه القناة.`;
+    try {
+      await axios.post(`https://api.telegram.org/bot${token}/sendMessage`, {
+        chat_id: chatId, text, parse_mode: 'Markdown',
+      }, { timeout: 8000 });
+      return { success: true };
+    } catch (e: any) {
+      const msg = e?.response?.data?.description || e?.message || 'فشل الإرسال';
+      return { success: false, error: msg };
+    }
+  },
 };

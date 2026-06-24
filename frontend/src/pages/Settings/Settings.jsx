@@ -96,7 +96,52 @@ export default function Settings() {
   const [currency, setCurrency] = useState('IQD')
   const [isSavingProfile, setIsSavingProfile] = useState(false)
 
-  // ── Notifications ────────────────────────────────────────────────────────
+  // ── Telegram bot integration (real bot API) ──────────────────────────────
+  const [tgBotToken, setTgBotToken] = useState('')
+  const [tgChatId, setTgChatId] = useState('')
+  const [tgBotInfo, setTgBotInfo] = useState(null)
+  const [tgSaving, setTgSaving] = useState(false)
+  const [tgTesting, setTgTesting] = useState(false)
+
+  async function loadTgStatus() {
+    try {
+      const s = await rpc('telegram:getStatus')
+      if (s?.bot) setTgBotInfo(s.bot)
+      else setTgBotInfo(null)
+    } catch {}
+  }
+
+  async function saveTgToken() {
+    setTgSaving(true)
+    try {
+      const res = await rpc('telegram:saveToken', { token: tgBotToken.trim() })
+      if (res?.success) {
+        setTgBotInfo(res.bot)
+        toast.success(`تم ربط البوت: @${res.bot?.username || 'unknown'}`)
+        setTgBotToken('')
+      } else {
+        toast.error(res?.error || 'فشل التحقق من التوكن')
+      }
+    } catch (e) { toast.error(e.message) }
+    setTgSaving(false)
+  }
+
+  async function saveTgChat() {
+    try {
+      await rpc('settings:setTelegramAdminChat', { chat_id: tgChatId.trim() })
+      toast.success('تم حفظ Chat ID')
+    } catch (e) { toast.error(e.message) }
+  }
+
+  async function testTg() {
+    setTgTesting(true)
+    const res = await rpc('telegram:sendTest').catch(e => ({ success: false, error: e.message }))
+    if (res?.success) toast.success('تم إرسال رسالة الاختبار ✓ — راجع القناة')
+    else toast.error(res?.error || 'فشل الإرسال')
+    setTgTesting(false)
+  }
+
+  // ── Notifications (legacy email) ─────────────────────────────────────────
   const [notifMethod, setNotifMethod] = useState('telegram')
   const [notifTgToken, setNotifTgToken] = useState('')
   const [adminChatId, setAdminChatId] = useState('')
@@ -141,7 +186,9 @@ export default function Settings() {
     }
     setTgStatus(tgS?.status || 'disconnected')
     setWaStatus(waS?.status || 'disconnected')
-  }, [])
+    if (tgS?.bot) setTgBotInfo(tgS.bot)
+    if (profile?.admin_telegram_chat_id) setTgChatId(profile.admin_telegram_chat_id)
+  }, [profile])
 
   // ─────────────────────────────────────────────────────────────────────────
   // Meta: Step 1 — OAuth login
@@ -469,13 +516,10 @@ export default function Settings() {
                       ) : (
                         <div style={{fontSize:12, color:'var(--text-muted)', marginBottom:12}}>لم يُربط بعد. تواصل معنا لربط الحساب خلال 10 دقائق.</div>
                       )}
-                      {pc.key === 'telegram' && !connected ? (
-                        <div style={{display:'flex', gap:6}}>
-                          <input type="text" className="input" value={tgToken} onChange={e=>setTgToken(e.target.value)} placeholder="123456:ABC..." style={{flex:1, fontSize:12}} dir="ltr" />
-                          <button className="btn btn-primary btn-sm" onClick={connectTG} disabled={tgConnecting || !tgToken}>
-                            {tgConnecting ? '...' : 'ربط'}
-                          </button>
-                        </div>
+                      {pc.key === 'telegram' ? (
+                        <button className="btn btn-primary btn-sm w-full" onClick={()=>setTab(3)}>
+                          {connected ? 'إدارة بوت تلغرام' : 'ربط بوت تلغرام'}
+                        </button>
                       ) : (
                         <button className="btn btn-primary btn-sm w-full" onClick={()=>nav('/contact')}>
                           {connected ? 'إدارة عبر الفريق' : 'تواصل لربط الحساب'}
@@ -557,8 +601,84 @@ export default function Settings() {
           </div>
         )}
 
-        {/* ── Tab 3: Notifications ── */}
+        {/* ── Tab 3: Notifications + Telegram bot ── */}
         {tab === 3 && (
+          <div className="animate-fade">
+            {/* ===== Telegram bot integration ===== */}
+            <div className="card" style={{marginBottom:20, background:'linear-gradient(135deg, rgba(37,99,235,0.06), rgba(43,178,76,0.04))', border:'1px solid rgba(43,178,76,0.3)'}}>
+              <div style={{display:'flex', alignItems:'center', gap:12, marginBottom:8}}>
+                <div style={{width:42, height:42, borderRadius:10, background:'#229ED9', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:20}}>✈</div>
+                <div>
+                  <div className="card-title" style={{margin:0}}>بوت تلغرام للإشعارات</div>
+                  <div style={{fontSize:12, color:'var(--text-muted)'}}>اربط بوت تلغرام لاستقبال إشعارات الطلبات الجديدة والشكاوى في قناة/جروب خاص بك.</div>
+                </div>
+              </div>
+
+              {tgBotInfo ? (
+                <div style={{background:'rgba(43,178,76,0.1)', border:'1px solid rgba(43,178,76,0.3)', borderRadius:10, padding:'12px 16px', marginTop:14, display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, flexWrap:'wrap'}}>
+                  <div style={{display:'flex', alignItems:'center', gap:10, fontSize:13}}>
+                    <span style={{color:'#34d399', fontSize:18}}>✓</span>
+                    <div>
+                      <div style={{fontWeight:700}}>البوت مربوط: <span style={{color:'#34d399'}}>@{tgBotInfo.username}</span></div>
+                      <div style={{fontSize:11, color:'var(--text-muted)'}}>{tgBotInfo.first_name}</div>
+                    </div>
+                  </div>
+                  <button className="btn btn-secondary btn-sm" onClick={async () => {
+                    if (!confirm('فصل البوت؟')) return
+                    await rpc('telegram:saveToken', { token: '' })
+                    setTgBotInfo(null); toast.success('تم الفصل')
+                  }}>فصل البوت</button>
+                </div>
+              ) : (
+                <>
+                  <div className="input-group" style={{marginTop:14}}>
+                    <label className="input-label">1. توكن البوت (من @BotFather)</label>
+                    <div style={{display:'flex', gap:6}}>
+                      <input className="input" dir="ltr" style={{flex:1, fontFamily:'monospace'}}
+                        placeholder="123456789:AAAAAAAA..." value={tgBotToken}
+                        onChange={e => setTgBotToken(e.target.value)} />
+                      <button className="btn btn-primary" onClick={saveTgToken} disabled={tgSaving || !tgBotToken.trim()}>
+                        {tgSaving ? '...' : 'حفظ وتحقق'}
+                      </button>
+                    </div>
+                    <div className="input-hint">
+                      أنشئ بوت جديد من <a href="https://t.me/BotFather" target="_blank" rel="noreferrer" style={{color:'var(--accent)'}}>@BotFather</a> ثم انسخ التوكن هنا.
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Chat ID — required for sending */}
+              <div className="input-group" style={{marginTop:14}}>
+                <label className="input-label">2. معرف القناة/الجروب (Chat ID)</label>
+                <div style={{display:'flex', gap:6}}>
+                  <input className="input" dir="ltr" style={{flex:1, fontFamily:'monospace'}}
+                    placeholder="-1001234567890 أو 123456789" value={tgChatId}
+                    onChange={e => setTgChatId(e.target.value)} />
+                  <button className="btn btn-primary" onClick={saveTgChat} disabled={!tgChatId.trim()}>
+                    حفظ
+                  </button>
+                </div>
+                <div className="input-hint">
+                  للقنوات/الجروبات الخاصة: أضف البوت كأدمن في القناة، ثم أرسل /start في @userinfobot لمعرفة الـ ID.
+                  معرفات القنوات تبدأ بـ -100
+                </div>
+              </div>
+
+              {/* Test button */}
+              {tgBotInfo && tgChatId && (
+                <button className="btn btn-secondary" style={{marginTop:14, width:'100%'}} onClick={testTg} disabled={tgTesting}>
+                  {tgTesting ? 'جارٍ الإرسال...' : '🧪 إرسال رسالة اختبار'}
+                </button>
+              )}
+
+              <div style={{marginTop:14, fontSize:12, color:'var(--text-muted)', borderTop:'1px dashed var(--border-color)', paddingTop:12}}>
+                💡 بعد الربط: أي طلب جديد أو شكوى ستظهر تلقائياً في القناة مع رابط مباشر للمحادثة على الموقع.
+              </div>
+            </div>
+
+            {/* ===== Legacy email/notification settings ===== */}
+            <div className="card animate-fade">
           <div className="card animate-fade">
             <div className="card-title">إعدادات الإشعارات وتنبيهات الإدارة</div>
             <div className="input-group" style={{marginBottom:20}}>
@@ -605,6 +725,7 @@ export default function Settings() {
             <button className="btn btn-primary" onClick={saveNotifSettings} disabled={isSavingNotif} style={{width:'100%'}}>
               <img src={saveIcon} className="btn-img-icon" /> {isSavingNotif ? 'جارٍ الحفظ...' : 'حفظ إعدادات الإشعارات'}
             </button>
+          </div>
           </div>
         )}
 
