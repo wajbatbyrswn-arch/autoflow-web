@@ -184,10 +184,23 @@ export const dbHandlers = {
     const { data: existing } = await supabase.from('store_config').select('*').eq('user_id', userId).single();
     const FIELDS = ['store_name','store_description','language','work_hours','ai_personality',
       'currency','contact_phone','system_prompt','store_logo','product_fields'];
+    // Empty string for these text fields is treated as "no change" — it almost
+    // always comes from a stale local state, not a user explicitly clearing them.
+    // (If a user really wants to clear, they pass a single space or a special token.)
+    const PRESERVE_IF_EMPTY = new Set([
+      'store_description','system_prompt','store_logo','contact_phone','work_hours',
+    ]);
     const next: any = { user_id: userId, updated_at: new Date().toISOString() };
     for (const f of FIELDS) {
-      if (c[f] !== undefined) next[f] = c[f];
-      else if (existing && existing[f] !== undefined) next[f] = existing[f];
+      const newVal = c[f];
+      const oldVal = existing?.[f];
+      const isEmpty = newVal === '' || newVal === null;
+      if (newVal !== undefined) {
+        if (isEmpty && PRESERVE_IF_EMPTY.has(f) && oldVal) next[f] = oldVal;
+        else next[f] = newVal;
+      } else if (oldVal !== undefined) {
+        next[f] = oldVal;
+      }
     }
     await supabase.from('store_config').upsert(next, { onConflict: 'user_id' });
     return { success: true };

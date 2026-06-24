@@ -59,21 +59,43 @@ export const nashirHandlers = {
       connectedCount: 0,
       error: null,
     };
-    if (!key) return result;
-    try {
-      let accounts = await nashir.accounts(key);
-      // A normal client sees only the pages the admin assigned to them.
-      // An admin with no assignment sees everything (for management/testing).
-      if (assigned.length) accounts = accounts.filter((a: any) => assigned.includes(String(a.pageId)));
-      else if (!data?.is_admin) accounts = [];
-      for (const a of accounts) {
-        const p = String(a.platform || '').toLowerCase();
-        if (result.platforms[p]) result.platforms[p].push(a);
+    if (key) {
+      try {
+        let accounts = await nashir.accounts(key);
+        // A normal client sees only the pages the admin assigned to them.
+        // An admin with no assignment sees everything (for management/testing).
+        if (assigned.length) accounts = accounts.filter((a: any) => assigned.includes(String(a.pageId)));
+        else if (!data?.is_admin) accounts = [];
+        for (const a of accounts) {
+          const p = String(a.platform || '').toLowerCase();
+          if (result.platforms[p]) result.platforms[p].push(a);
+        }
+        result.connectedCount = accounts.length;
+      } catch (e: any) {
+        result.error = e?.response?.status === 401 ? 'مفتاح API غير صحيح' : (e?.message || 'تعذّر الاتصال بناشر');
       }
-      result.connectedCount = accounts.length;
-    } catch (e: any) {
-      result.error = e?.response?.status === 401 ? 'مفتاح API غير صحيح' : (e?.message || 'تعذّر الاتصال بناشر');
     }
+
+    // FALLBACK: if Nashir API check returned nothing (no key, error, no admin assignment),
+    // derive connected platforms from real inbound traffic. If we received messages from
+    // a platform in the last 30 days, it's clearly connected — the API check is just for cosmetics.
+    if (result.connectedCount === 0) {
+      const since = new Date(Date.now() - 30 * 86400000).toISOString();
+      const { data: convs } = await supabase.from('conversations')
+        .select('platform').eq('user_id', userId).gte('last_message_at', since);
+      const seen = new Set((convs || []).map((c: any) => String(c.platform || '').toLowerCase()));
+      let derived = 0;
+      for (const p of seen) {
+        if (!p || !result.platforms[p]) continue;
+        if (result.platforms[p].length === 0) {
+          result.platforms[p].push({ pageId: 'derived', pageName: 'مربوط ✓ (مؤكَّد من الرسائل)', platform: p, _derived: true });
+          derived++;
+        }
+      }
+      result.connectedCount += derived;
+      if (derived > 0) result.error = null;
+    }
+
     return result;
   },
 

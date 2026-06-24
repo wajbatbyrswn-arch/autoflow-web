@@ -3,6 +3,7 @@ import { nashir, nashirKey } from './nashir';
 import { resolveConfig, sendToAI } from './ai';
 import { emit } from '../events';
 import { createNotification } from './notifications';
+import { processInboundComment } from './comments';
 
 // Arabic + English keywords that strongly suggest a customer complaint.
 const COMPLAINT_PATTERNS = [
@@ -192,6 +193,12 @@ async function maybeCompressHistory(convId: number, userId: string, config: any)
 export async function processInbound(userId: string, raw: any): Promise<string> {
   const item = normalize(raw);
   if (!item.content) { console.warn('[inbound] no content:', JSON.stringify(raw).slice(0, 400)); return ''; }
+
+  // Comments take a separate code path: comment_automations + AI comment reply + auto-delete bad.
+  if (item.isComment) {
+    try { await processInboundComment(userId, raw); } catch (e: any) { console.error('[inbound comment]', e?.message || e); }
+    return '';
+  }
 
   const { data: exists } = await supabase.from('messages').select('id').eq('user_id', userId).eq('nashir_message_id', item.dedupKey).single();
 

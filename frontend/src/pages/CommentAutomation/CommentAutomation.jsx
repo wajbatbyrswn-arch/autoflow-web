@@ -1,217 +1,313 @@
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
-import './CommentAutomation.css'
+import { MessageCircle, Trash2, Edit3, Plus, Power, Sparkles, AlertOctagon, X } from 'lucide-react'
 import facebookIcon from '../../assets/icons/facebook.png'
 import instagramIcon from '../../assets/icons/instagram.png'
-import commentsIcon from '../../assets/icons/comments.png'
-import addIcon from '../../assets/icons/add.png'
-import editIcon from '../../assets/icons/edit.png'
-import deleteIcon from '../../assets/icons/delete.png'
+import './CommentAutomation.css'
 
-const PLATFORMS = ['facebook','instagram']
-const TRIGGER_TYPES = [{v:'all',l:'الجميع'},{v:'keyword',l:'كلمة مفتاحية'},{v:'emoji',l:'إيموجي محدد'}]
-const REPLY_TYPES = [{v:'text',l:'رد نصي ثابت'},{v:'ai',l:'رد بالـ AI'},{v:'none',l:'بدون رد علني'}]
-const empty = { name:'', platform:'facebook', post_url:'', target:'all', trigger_type:'keyword', trigger_value:'', reply_type:'text', reply_text:'', dm_enabled:false, dm_text:'', require_follow:false, is_active:true }
+const TABS = [
+  { id: 'inbox',      label: 'صندوق التعليقات' },
+  { id: 'automation', label: 'اتمتة التعليقات' },
+  { id: 'settings',   label: 'الإعدادات' },
+]
+
+const PLATFORM_ICON = { facebook: facebookIcon, instagram: instagramIcon }
+const PLATFORM_NAME = { facebook: 'فيسبوك', instagram: 'إنستغرام' }
+const PLATFORM_COLOR = { facebook: '#1877F2', instagram: '#C13584' }
+
+function emptyAutomation() {
+  return {
+    platform: 'facebook',
+    post_id: '',
+    post_url: '',
+    post_title: '',
+    trigger_keywords: [],
+    comment_reply: 'شكراً على تعليقك! تم إرسال التفاصيل لك على الخاص ✨',
+    dm_message: '',
+    dm_attachment_url: '',
+    is_active: true,
+  }
+}
 
 export default function CommentAutomation() {
-  const [tab, setTab] = useState(0)
-  const [campaigns, setCampaigns] = useState([])
-  const [logs, setLogs] = useState([])
-  const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState(empty)
-
-  useEffect(() => { loadAll() }, [])
+  const [tab, setTab] = useState('inbox')
+  const [comments, setComments] = useState([])
+  const [automations, setAutomations] = useState([])
+  const [settings, setSettings] = useState({ auto_delete_bad_comments: false, ai_reply_comments_enabled: true })
+  const [loading, setLoading] = useState(true)
+  const [editing, setEditing] = useState(null)
+  const [keywordInput, setKeywordInput] = useState('')
 
   async function loadAll() {
-    const c = await window.api?.db.getCampaigns() || []
-    setCampaigns(c)
-    const l = await window.api?.db.getActivityLog() || []
-    setLogs(l)
+    setLoading(true)
+    try {
+      const [c, a, s] = await Promise.all([
+        window.api?.comments?.list?.({ limit: 100 }).catch(() => []) || [],
+        window.api?.comments?.automations?.().catch(() => []) || [],
+        window.api?.comments?.getSettings?.().catch(() => ({})) || {},
+      ])
+      setComments(c); setAutomations(a)
+      setSettings(prev => ({ ...prev, ...s }))
+    } catch (e) { toast.error('تعذّر تحميل البيانات') }
+    setLoading(false)
   }
+  useEffect(() => { loadAll() }, [])
 
-  async function saveCampaign() {
-    if (!form.name) return toast.error('اسم الحملة مطلوب')
-    await window.api?.db.saveCampaign(form)
-    toast.success('تم حفظ الحملة ✓')
-    setShowForm(false); setForm(empty)
-    loadAll()
-  }
-
-  async function deleteCampaign(id) {
-    if (!confirm('حذف هذه الحملة؟')) return
-    await window.api?.db.deleteCampaign(id)
+  async function deleteComment(id) {
+    if (!confirm('إخفاء/حذف هذا التعليق؟')) return
+    await window.api?.comments?.deleteComment?.(id)
+    setComments(prev => prev.map(c => c.id === id ? { ...c, deleted: true } : c))
     toast.success('تم الحذف')
-    loadAll()
   }
 
-  async function toggleActive(camp) {
-    await window.api?.db.saveCampaign({ ...camp, is_active: !camp.is_active })
-    loadAll()
+  async function saveSettings(patch) {
+    const next = { ...settings, ...patch }
+    setSettings(next)
+    await window.api?.comments?.saveSettings?.(next)
+    toast.success('تم الحفظ')
+  }
+
+  async function saveAutomation() {
+    if (!editing.post_id || !editing.trigger_keywords?.length || !editing.comment_reply || !editing.dm_message) {
+      toast.error('الحقول المطلوبة: المنشور، الكلمات المفتاحية، رد التعليق، رسالة الخاص')
+      return
+    }
+    try {
+      const saved = await window.api?.comments?.saveAutomation?.(editing)
+      toast.success('تم الحفظ ✓')
+      setEditing(null); setKeywordInput('')
+      setAutomations(prev => editing.id ? prev.map(a => a.id === editing.id ? saved : a) : [saved, ...prev])
+    } catch (e) { toast.error(e.message || 'فشل الحفظ') }
+  }
+
+  async function deleteAutomation(id) {
+    if (!confirm('حذف هذه الاتمتة؟')) return
+    await window.api?.comments?.deleteAutomation?.(id)
+    setAutomations(prev => prev.filter(a => a.id !== id))
+    toast.success('تم الحذف')
+  }
+
+  async function toggleAutomation(a) {
+    await window.api?.comments?.toggleAutomation?.(a.id, !a.is_active)
+    setAutomations(prev => prev.map(x => x.id === a.id ? { ...x, is_active: !x.is_active } : x))
+  }
+
+  function addKeyword() {
+    const v = keywordInput.trim()
+    if (!v) return
+    setEditing(p => ({ ...p, trigger_keywords: [...(p.trigger_keywords || []), v] }))
+    setKeywordInput('')
+  }
+  function removeKeyword(k) {
+    setEditing(p => ({ ...p, trigger_keywords: p.trigger_keywords.filter(x => x !== k) }))
   }
 
   return (
-    <div className="animate-fade">
+    <div className="animate-fade ca-page">
       <div className="page-header">
-        <h1>أتمتة التعليقات</h1>
-        <p>ردود تلقائية ذكية على تعليقات فيسبوك وإنستغرام</p>
+        <h1 style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <MessageCircle size={24} /> اتمتة التعليقات
+        </h1>
+        <p>أدر تعليقاتك على فيسبوك وإنستغرام: ردود ذكية تلقائية، حذف التعليقات السيئة، وإطلاق رسائل خاصة عند كلمات معيّنة.</p>
       </div>
 
-      <div className="tabs">
-        {[
-          { label: 'الحملات', icon: commentsIcon },
-          { label: 'سجل الأنشطة', icon: commentsIcon }
-        ].map((t, i) => (
-          <button key={i} className={`tab ${tab===i?'active':''}`} onClick={() => setTab(i)}>
-            <img src={t.icon} alt={t.label} className="tab-img-icon" />
-            <span>{t.label}</span>
+      <div className="ca-tabs">
+        {TABS.map(t => (
+          <button key={t.id} className={`ca-tab ${tab === t.id ? 'on' : ''}`} onClick={() => setTab(t.id)}>
+            {t.label}
           </button>
         ))}
       </div>
 
-      {/* Campaigns */}
-      {tab === 0 && (
-        <div className="animate-fade">
-          <div className="flex justify-between items-center mb-4">
-            <button className="btn btn-primary btn-sm flex-center" onClick={() => { setForm(empty); setShowForm(true) }}>
-              <img src={addIcon} className="btn-img-icon" /> حملة جديدة
-            </button>
-            <span className="badge badge-info">{campaigns.length} حملة</span>
+      {/* ===== INBOX ===== */}
+      {tab === 'inbox' && (
+        <div className="ca-section">
+          {loading ? <div className="ca-empty">جارٍ التحميل...</div> :
+            comments.length === 0 ? <div className="ca-empty">لا توجد تعليقات بعد. ستظهر هنا تلقائياً عند ربط حساباتك.</div> :
+            <div className="comments-list">
+              {comments.map(c => {
+                const color = PLATFORM_COLOR[c.platform] || '#888'
+                return (
+                  <div key={c.id} className={`comment-card ${c.deleted ? 'deleted' : ''}`} style={{ borderRightColor: color }}>
+                    <div className="cc-head">
+                      <img src={PLATFORM_ICON[c.platform]} alt={c.platform} className="cc-platform-ico" />
+                      <strong>{c.commenter_name || 'متابع'}</strong>
+                      {c.is_negative && <span className="tag tag-red"><AlertOctagon size={11} /> تعليق سلبي</span>}
+                      {c.ai_replied && <span className="tag tag-green">✓ تم الرد</span>}
+                      {c.automation_triggered && <span className="tag tag-blue"><Sparkles size={11} /> اتمتة</span>}
+                      {c.deleted && <span className="tag tag-grey">محذوف</span>}
+                      <span className="cc-time">{new Date(c.created_at).toLocaleString('ar-EG')}</span>
+                    </div>
+                    <p className="cc-body">{c.content}</p>
+                    {c.post_id && <div className="cc-post">المنشور: {c.post_id.slice(0, 30)}{c.post_id.length > 30 ? '...' : ''}</div>}
+                    {!c.deleted && (
+                      <button className="cc-del-btn" onClick={() => deleteComment(c.id)}>
+                        <Trash2 size={13} /> إخفاء/حذف
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          }
+        </div>
+      )}
+
+      {/* ===== AUTOMATIONS ===== */}
+      {tab === 'automation' && (
+        <div className="ca-section">
+          <div className="ca-info-box">
+            <Sparkles size={18} />
+            <div>
+              <strong>كيف تعمل اتمتة التعليقات؟</strong>
+              <p>عند أي تعليق على المنشور المحدد يحتوي على كلمة من الكلمات المفتاحية، يتم تلقائياً:
+                1) الرد العام على التعليق برسالة "تم الإرسال للخاص"،
+                2) إرسال رسالة خاصة (DM) للزبون بالتفاصيل/الرابط/الملف.
+                <br/>الردود الذكية على التعليقات تتوقف لهذا المنشور.</p>
+            </div>
           </div>
 
-          {showForm && (
-            <div className="card mb-4 campaign-form animate-fade">
-              <div className="card-title">{form.id ? 'تعديل الحملة' : 'حملة جديدة'}</div>
-              <div className="grid-2">
-                <div className="input-group">
-                  <label className="input-label">اسم الحملة *</label>
-                  <input className="input" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="مثال: حملة رمضان" />
-                </div>
-                <div className="input-group">
-                  <label className="input-label">المنصة</label>
-                  <select className="select" value={form.platform} onChange={e=>setForm(f=>({...f,platform:e.target.value}))}>
-                    <option value="facebook">فيسبوك</option>
-                    <option value="instagram">إنستغرام</option>
-                  </select>
-                </div>
-              </div>
-              <div className="input-group">
-                <label className="input-label">رابط المنشور / الريلز</label>
-                <input className="input" value={form.post_url} onChange={e=>setForm(f=>({...f,post_url:e.target.value}))} placeholder="https://facebook.com/..." />
-              </div>
-              <div className="grid-2">
-                <div className="input-group">
-                  <label className="input-label">نوع المُشغِّل</label>
-                  <select className="select" value={form.trigger_type} onChange={e=>setForm(f=>({...f,trigger_type:e.target.value}))}>
-                    {TRIGGER_TYPES.map(t=><option key={t.v} value={t.v}>{t.l}</option>)}
-                  </select>
-                </div>
-                {form.trigger_type !== 'all' && (
-                  <div className="input-group">
-                    <label className="input-label">{form.trigger_type==='keyword'?'الكلمة المفتاحية':'الإيموجي'}</label>
-                    <input className="input" value={form.trigger_value} onChange={e=>setForm(f=>({...f,trigger_value:e.target.value}))} placeholder={form.trigger_type==='keyword'?'السعر؟ كيف أطلب':'❤️'} />
-                  </div>
-                )}
-              </div>
-              <div className="input-group">
-                <label className="input-label">نوع الرد العلني</label>
-                <select className="select" value={form.reply_type} onChange={e=>setForm(f=>({...f,reply_type:e.target.value}))}>
-                  {REPLY_TYPES.map(t=><option key={t.v} value={t.v}>{t.l}</option>)}
-                </select>
-              </div>
-              {form.reply_type !== 'none' && form.reply_type !== 'ai' && (
-                <div className="input-group">
-                  <label className="input-label">نص الرد العلني</label>
-                  <textarea className="textarea" style={{minHeight:80}} value={form.reply_text} onChange={e=>setForm(f=>({...f,reply_text:e.target.value}))} placeholder="شكراً على تعليقك! راسلنا خاصةً للتفاصيل" />
-                </div>
-              )}
-              <div className="divider" />
-              <div className="toggle-row">
-                <div>
-                  <div style={{fontWeight:600,fontSize:13}}>تفعيل الرسالة الخاصة (DM)</div>
-                  <div style={{fontSize:12,color:'var(--text-muted)'}}>إرسال رسالة خاصة لكل من علّق</div>
-                </div>
-                <label className="toggle"><input type="checkbox" checked={form.dm_enabled} onChange={e=>setForm(f=>({...f,dm_enabled:e.target.checked}))} /><span className="toggle-slider"></span></label>
-              </div>
-              {form.dm_enabled && (
-                <div className="input-group mt-4">
-                  <label className="input-label">نص الرسالة الخاصة</label>
-                  <textarea className="textarea" style={{minHeight:100}} value={form.dm_text} onChange={e=>setForm(f=>({...f,dm_text:e.target.value}))} placeholder="أهلاً! شكراً لاهتمامك. إليك التفاصيل..." />
-                </div>
-              )}
-              {form.dm_enabled && (
-                <div className="toggle-row">
-                  <div>
-                    <div style={{fontWeight:600,fontSize:13}}>شرط المتابعة</div>
-                    <div style={{fontSize:12,color:'var(--text-muted)'}}>أرسل DM فقط للمتابعين</div>
-                  </div>
-                  <label className="toggle"><input type="checkbox" checked={form.require_follow} onChange={e=>setForm(f=>({...f,require_follow:e.target.checked}))} /><span className="toggle-slider"></span></label>
-                </div>
-              )}
-              <div className="flex gap-3 mt-4">
-                <button className="btn btn-primary btn-sm" onClick={saveCampaign}>حفظ الحملة</button>
-                <button className="btn btn-secondary btn-sm" onClick={() => setShowForm(false)}>إلغاء</button>
-              </div>
-            </div>
-          )}
+          <button className="btn btn-primary ca-add-btn" onClick={() => setEditing(emptyAutomation())}>
+            <Plus size={16} /> إضافة اتمتة جديدة
+          </button>
 
-          <div className="campaigns-grid">
-            {campaigns.length === 0 ? (
-              <div className="card"><div className="empty-state"><p>لا توجد حملات — أنشئ أولى حملاتك!</p></div></div>
-            ) : campaigns.map(c => (
-              <div key={c.id} className={`card camp-card ${!c.is_active?'inactive':''}`}>
-                <div className="flex justify-between items-center mb-4">
-                  <div className="flex items-center gap-3">
-                    <img src={c.platform === 'facebook' ? facebookIcon : instagramIcon} className="platform-mini-img" />
-                    <div>
-                      <div className="camp-name">{c.name}</div>
-                      <span className={`badge ${c.platform==='facebook'?'badge-info':'badge-danger'}`}>{c.platform==='facebook'?'فيسبوك':'إنستغرام'}</span>
+          {automations.length === 0 ? (
+            <div className="ca-empty">لا توجد اتمتات بعد. اضغط "إضافة" أعلاه لبدء أول واحدة.</div>
+          ) : (
+            <div className="automations-grid">
+              {automations.map(a => (
+                <div key={a.id} className={`auto-card ${a.is_active ? '' : 'off'}`}>
+                  <div className="auto-head">
+                    <img src={PLATFORM_ICON[a.platform]} className="cc-platform-ico" />
+                    <strong>{a.post_title || `منشور ${a.post_id.slice(0, 12)}...`}</strong>
+                    <span className={`tag ${a.is_active ? 'tag-green' : 'tag-grey'}`}>
+                      {a.is_active ? 'نشطة' : 'متوقفة'}
+                    </span>
+                  </div>
+                  <div className="auto-kws">
+                    {(a.trigger_keywords || []).map(k => <span key={k} className="kw-chip">#{k}</span>)}
+                  </div>
+                  <div className="auto-preview">
+                    <div><strong>الرد العام:</strong> {a.comment_reply}</div>
+                    <div><strong>رسالة الخاص:</strong> {a.dm_message.slice(0, 80)}{a.dm_message.length > 80 ? '...' : ''}</div>
+                    {a.dm_attachment_url && <div><strong>مرفق:</strong> <a href={a.dm_attachment_url} target="_blank" rel="noreferrer">رابط</a></div>}
+                  </div>
+                  <div className="auto-foot">
+                    <span style={{ opacity: .6, fontSize: 12 }}>تم تشغيلها {a.triggered_count || 0} مرة</span>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button className="btn btn-secondary btn-sm" onClick={() => toggleAutomation(a)}><Power size={13} /></button>
+                      <button className="btn btn-secondary btn-sm" onClick={() => { setEditing(a); setKeywordInput('') }}><Edit3 size={13} /></button>
+                      <button className="btn btn-danger btn-sm" onClick={() => deleteAutomation(a.id)}><Trash2 size={13} /></button>
                     </div>
                   </div>
-                  <label className="toggle"><input type="checkbox" checked={!!c.is_active} onChange={() => toggleActive(c)} /><span className="toggle-slider"></span></label>
                 </div>
-                <div className="camp-details">
-                  <div>المشغل: {TRIGGER_TYPES.find(t=>t.v===c.trigger_type)?.l}{c.trigger_value ? ': '+c.trigger_value : ''}</div>
-                  <div>الرد: {REPLY_TYPES.find(t=>t.v===c.reply_type)?.l}</div>
-                  {c.dm_enabled ? <div>الرسائل الخاصة: مفعّل{c.require_follow?' (للمتابعين فقط)':''}</div> : null}
-                </div>
-                <div className="flex gap-2 mt-4">
-                  <button className="btn btn-secondary btn-sm flex-center" onClick={() => { setForm({...c, dm_enabled:!!c.dm_enabled, require_follow:!!c.require_follow, is_active:!!c.is_active}); setShowForm(true) }}>
-                    <img src={editIcon} className="btn-img-icon" /> تعديل
-                  </button>
-                  <button className="btn btn-danger btn-sm flex-center" onClick={() => deleteCampaign(c.id)}>
-                    <img src={deleteIcon} className="btn-img-icon" /> حذف
-                  </button>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ===== SETTINGS ===== */}
+      {tab === 'settings' && (
+        <div className="ca-section">
+          <div className="setting-row">
+            <div>
+              <div className="setting-title">الرد الذكي على التعليقات</div>
+              <div className="setting-desc">يرد الـ AI تلقائياً على التعليقات بشكل عام ومختصر. لا يُطبَّق على المنشورات التي عليها اتمتة.</div>
+            </div>
+            <label className="switch">
+              <input type="checkbox" checked={!!settings.ai_reply_comments_enabled}
+                     onChange={e => saveSettings({ ai_reply_comments_enabled: e.target.checked })} />
+              <span className="slider" />
+            </label>
+          </div>
+
+          <div className="setting-row">
+            <div>
+              <div className="setting-title">حذف التعليقات السيئة تلقائياً</div>
+              <div className="setting-desc">عند رصد كلمات هجومية/مسيئة في التعليق، يتم إخفاؤه/حذفه تلقائياً.</div>
+            </div>
+            <label className="switch">
+              <input type="checkbox" checked={!!settings.auto_delete_bad_comments}
+                     onChange={e => saveSettings({ auto_delete_bad_comments: e.target.checked })} />
+              <span className="slider" />
+            </label>
           </div>
         </div>
       )}
 
-      {/* Activity Log */}
-      {tab === 1 && (
-        <div className="card animate-fade">
-          <div className="card-title">سجل الأنشطة</div>
-          <div className="table-wrap">
-            <table>
-              <thead><tr><th>المنصة</th><th>المعلِّق</th><th>التعليق</th><th>الرد</th><th>DM</th><th>الوقت</th></tr></thead>
-              <tbody>
-                {logs.length === 0 ? (
-                  <tr><td colSpan={6}><div className="empty-state"><p>لا توجد أنشطة بعد</p></div></td></tr>
-                ) : logs.map((l,i) => (
-                  <tr key={i}>
-                    <td>
-                      <img src={l.platform === 'facebook' ? facebookIcon : l.platform === 'instagram' ? instagramIcon : commentsIcon} className="platform-tiny-img" />
-                    </td>
-                    <td><strong>{l.sender_name||'—'}</strong></td>
-                    <td style={{maxWidth:200,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{l.content||'—'}</td>
-                    <td style={{maxWidth:200,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{l.reply_text||'—'}</td>
-                    <td>{l.dm_sent ? <span className="badge badge-success">✓</span> : <span className="badge badge-danger">—</span>}</td>
-                    <td style={{fontSize:11,color:'var(--text-muted)'}}>{new Date(l.created_at).toLocaleString('ar')}</td>
-                  </tr>
+      {/* ===== EDITOR MODAL ===== */}
+      {editing && (
+        <div className="ca-modal-overlay" onClick={() => setEditing(null)}>
+          <div className="ca-modal" onClick={e => e.stopPropagation()}>
+            <div className="ca-modal-head">
+              <h3>{editing.id ? 'تعديل اتمتة' : 'اتمتة جديدة'}</h3>
+              <button onClick={() => setEditing(null)}><X size={18} /></button>
+            </div>
+
+            <div className="input-group">
+              <label className="input-label">المنصة</label>
+              <select className="input" value={editing.platform} onChange={e => setEditing(p => ({ ...p, platform: e.target.value }))}>
+                <option value="facebook">فيسبوك</option>
+                <option value="instagram">إنستغرام</option>
+              </select>
+            </div>
+
+            <div className="input-group">
+              <label className="input-label">معرف المنشور (Post ID)</label>
+              <input className="input" dir="ltr" placeholder="123456789_987654321" value={editing.post_id}
+                     onChange={e => setEditing(p => ({ ...p, post_id: e.target.value }))} />
+              <div className="input-hint">تجده في رابط المنشور أو لوحة ناشر.</div>
+            </div>
+
+            <div className="input-group">
+              <label className="input-label">عنوان المنشور (اختياري — للتمييز)</label>
+              <input className="input" value={editing.post_title} placeholder="مثال: عرض الصيف 2026"
+                     onChange={e => setEditing(p => ({ ...p, post_title: e.target.value }))} />
+            </div>
+
+            <div className="input-group">
+              <label className="input-label">الكلمات المفتاحية للتفعيل</label>
+              <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                <input className="input" placeholder="مثال: تفاصيل" value={keywordInput}
+                       onChange={e => setKeywordInput(e.target.value)}
+                       onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addKeyword())} />
+                <button className="btn btn-primary" onClick={addKeyword}>إضافة</button>
+              </div>
+              <div className="kw-list">
+                {editing.trigger_keywords?.map(k => (
+                  <span key={k} className="kw-chip removable" onClick={() => removeKeyword(k)}>
+                    #{k} <X size={11} />
+                  </span>
                 ))}
-              </tbody>
-            </table>
+              </div>
+              <div className="input-hint">إذا احتوى التعليق على أي من هذه الكلمات، تتفعّل الاتمتة.</div>
+            </div>
+
+            <div className="input-group">
+              <label className="input-label">الرد العام على التعليق</label>
+              <input className="input" value={editing.comment_reply}
+                     onChange={e => setEditing(p => ({ ...p, comment_reply: e.target.value }))} />
+            </div>
+
+            <div className="input-group">
+              <label className="input-label">رسالة الخاص (DM)</label>
+              <textarea className="textarea" rows={4} value={editing.dm_message}
+                        placeholder="اكتب رسالة التفاصيل التي سترسل للزبون..."
+                        onChange={e => setEditing(p => ({ ...p, dm_message: e.target.value }))} />
+            </div>
+
+            <div className="input-group">
+              <label className="input-label">رابط مرفق (اختياري)</label>
+              <input className="input" dir="ltr" placeholder="https://..." value={editing.dm_attachment_url}
+                     onChange={e => setEditing(p => ({ ...p, dm_attachment_url: e.target.value }))} />
+              <div className="input-hint">رابط ملف PDF، صورة، أو موقع — يُضاف لرسالة الخاص.</div>
+            </div>
+
+            <div className="ca-modal-actions">
+              <button className="btn btn-secondary" onClick={() => setEditing(null)}>إلغاء</button>
+              <button className="btn btn-primary" onClick={saveAutomation}>حفظ الاتمتة</button>
+            </div>
           </div>
         </div>
       )}

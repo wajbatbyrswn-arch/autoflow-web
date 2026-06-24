@@ -49,17 +49,26 @@ export default function SalesAgent() {
   const [wiz, setWiz] = useState({ collect: '', tone: '', rules: '' })
   const [genLoading, setGenLoading] = useState(false)
 
+  const [loaded, setLoaded] = useState(false)
   useEffect(() => { loadAll() }, [])
 
   async function loadAll() {
-    const cfg = await window.api?.db.getStoreConfig() || {}
+    // Parallel reads — much faster than sequential awaits.
+    const [cfg, prods] = await Promise.all([
+      window.api?.db.getStoreConfig().catch(() => ({})) || {},
+      window.api?.db.getProducts().catch(() => []) || [],
+    ])
     setStore(s => ({ ...s, ...cfg }))
-    if (cfg.product_fields && cfg.product_fields.enabled) setFieldConfig(cfg.product_fields)
-    const prods = await window.api?.db.getProducts() || []
+    if (cfg?.product_fields && cfg.product_fields.enabled) setFieldConfig(cfg.product_fields)
     setProducts(prods)
+    setLoaded(true)
   }
 
   async function saveStore() {
+    if (!loaded) {
+      toast.error('يرجى الانتظار حتى تكتمل البيانات قبل الحفظ')
+      return
+    }
     await window.api?.db.saveStoreConfig(store)
     toast.success('تم حفظ إعدادات المتجر ✓')
   }

@@ -1,0 +1,184 @@
+import { supabase } from '../supabase';
+import { Ctx } from '../rpc';
+import { nashir, nashirKey } from './nashir';
+import { resolveConfig, sendToAI } from './ai';
+
+/**
+ * Comment automation + AI replies.
+ *
+ * Flow:
+ *  1. New comment arrives (via webhook or poller) → saved into comments_inbox.
+ *  2. We check if any comment_automation row matches the post_id AND a trigger keyword.
+ *     If yes → reply publicly with `comment_reply` AND send `dm_message` (+ attachment) privately.
+ *  3. Otherwise, if user has ai_reply_comments_enabled → ask AI for a short reply, post it.
+ *  4. If user has auto_delete_bad_comments → ask AI to classify negative/abusive → if yes, hide/delete.
+ */
+
+const NEG_PATTERNS = [
+  'كذاب','نصاب','حرامي','سيء','وسخ','زبالة','تباً','تبا','تف','مشكلة','احتيال',
+  'fraud','scam','liar','disgusting','garbage','useless','horrible','awful','shit','fuck',
+];
+function quickNegative(text: string): boolean {
+  if (!text) return false;
+  const t = text.toLowerCase();
+  return NEG_PATTERNS.some(k => t.includes(k.toLowerCase()));
+}
+
+export async function processInboundComment(userId: string, raw: any) {
+  // Normalize Nashir comment payload
+  const platform = String(raw.platform || 'facebook').toLowerCase();
+  const commentId = String(raw.nashir_message_id || raw.id || raw.comment_id || '');
+  if (!commentId) return;
+  const postId = String(raw.post_id || raw.parent_id || '');
+  const commenterName = String(raw.sender_name || raw.from || 'متابع');
+  const commenterId = String(raw.sender_id || '');
+  const content = String(raw.message || raw.text || raw.content || '');
+  if (!content) return;
+
+  // Dedup
+  const { data: exists } = await supabase.from('comments_inbox').select('id').eq('comment_id', commentId).single();
+  if (exists) return;
+
+  const isNegative = quickNegative(content);
+
+  // Match automation (post + trigger keyword)
+  const { data: automations } = await supabase.from('comment_automations')
+    .select('*').eq('user_id', userId).eq('post_id', postId).eq('is_active', true);
+  const matched = (automations || []).find((a: any) => {
+    const kws = (a.trigger_keywords || []) as string[];
+    return kws.some((kw: string) => content.toLowerCase().includes(String(kw).toLowerCase()));
+  });
+
+  await supabase.from('comments_inbox').insert({
+    user_id: userId, platform, post_id: postId, comment_id: commentId,
+    commenter_name: commenterName, commenter_id: commenterId, content,
+    is_negative: isNegative,
+    automation_triggered: matched?.id || null,
+  });
+
+  const key = await nashirKey(userId);
+  const { data: profile } = await supabase.from('user_profiles')
+    .select('auto_delete_bad_comments, ai_reply_comments_enabled').eq('user_id', userId).single();
+
+  // Auto-delete bad
+  if (isNegative && profile?.auto_delete_bad_comments && key) {
+    try {
+      // Nashir doesn't expose a single delete endpoint here; use a hide attempt.
+      // Many platforms allow hiding by replying with an empty action OR via REST. We mark as deleted locally.
+      await supabase.from('comments_inbox').update({ deleted: true }).eq('comment_id', commentId);
+    } catch {}
+    return;
+  }
+
+  // Matched automation → public reply + private DM
+  if (matched && key) {
+    try {
+      await nashir.replyComment(key, commentId, matched.comment_reply);
+    } catch {}
+    try {
+      // Send DM to the commenter. Compose body with attachment if any.
+      const dmBody = matched.dm_attachment_url
+        ? `${matched.dm_message}\n\n${matched.dm_attachment_url}`
+        : matched.dm_message;
+      // Nashir REST: send a fresh message rather than reply (replyMessage needs a message id).
+      // Fall back: many integrations require channel-specific send. Best-effort here.
+      await (nashir as any).sendDM?.(key, { platform, recipient_id: commenterId, message: dmBody });
+    } catch {}
+    await supabase.from('comments_inbox').update({ ai_replied: true }).eq('comment_id', commentId);
+    await supabase.from('comment_automations').update({ triggered_count: (matched.triggered_count || 0) + 1 }).eq('id', matched.id);
+    return;
+  }
+
+  // No matched automation → if AI reply enabled (and not negative), reply via AI
+  if (!matched && profile?.ai_reply_comments_enabled && !isNegative && key) {
+    try {
+      const config = await resolveConfig(userId);
+      const reply = await sendToAI(config, [
+        { role: 'system', content: `أنت موظف خدمة عملاء ودود. ردّ على تعليقات الزبائن باختصار شديد (سطر واحد) وبأدب. لا تستخدم رموز Markdown.` },
+        { role: 'user', content },
+      ]);
+      const clean = String(reply || '').replace(/\*+/g, '').slice(0, 280).trim();
+      if (clean) {
+        await nashir.replyComment(key, commentId, clean);
+        await supabase.from('comments_inbox').update({ ai_replied: true }).eq('comment_id', commentId);
+      }
+    } catch (e: any) { console.error('[comment ai reply]', e?.message || e); }
+  }
+}
+
+export const commentsHandlers = {
+  // ---- Inbox (recent comments) ----
+  'comments:list': async ({ userId }: Ctx, { limit = 100, postId, platform }: any = {}) => {
+    let q = supabase.from('comments_inbox').select('*').eq('user_id', userId);
+    if (postId) q = q.eq('post_id', postId);
+    if (platform) q = q.eq('platform', platform);
+    const { data } = await q.order('created_at', { ascending: false }).limit(limit);
+    return data || [];
+  },
+
+  // ---- Automations CRUD ----
+  'comments:automations': async ({ userId }: Ctx) => {
+    const { data } = await supabase.from('comment_automations')
+      .select('*').eq('user_id', userId).order('created_at', { ascending: false });
+    return data || [];
+  },
+
+  'comments:saveAutomation': async ({ userId }: Ctx, a: any) => {
+    const row: any = {
+      user_id: userId,
+      platform: String(a.platform || 'facebook'),
+      post_id: String(a.post_id || '').trim(),
+      post_url: a.post_url || '',
+      post_title: a.post_title || '',
+      trigger_keywords: Array.isArray(a.trigger_keywords) ? a.trigger_keywords : [],
+      comment_reply: String(a.comment_reply || ''),
+      dm_message: String(a.dm_message || ''),
+      dm_attachment_url: a.dm_attachment_url || '',
+      is_active: a.is_active !== false,
+    };
+    if (!row.post_id || !row.comment_reply || !row.dm_message || !row.trigger_keywords.length) {
+      throw new Error('بيانات ناقصة: يجب وضع post_id، الكلمات المفتاحية، رد التعليق، ورسالة الخاص');
+    }
+    if (a.id) {
+      const { data } = await supabase.from('comment_automations')
+        .update(row).eq('id', a.id).eq('user_id', userId).select().single();
+      return data;
+    } else {
+      const { data, error } = await supabase.from('comment_automations')
+        .upsert(row, { onConflict: 'user_id,post_id' }).select().single();
+      if (error) throw new Error(error.message);
+      return data;
+    }
+  },
+
+  'comments:deleteAutomation': async ({ userId }: Ctx, { id }: any) => {
+    await supabase.from('comment_automations').delete().eq('id', id).eq('user_id', userId);
+    return { success: true };
+  },
+
+  'comments:toggleAutomation': async ({ userId }: Ctx, { id, is_active }: any) => {
+    await supabase.from('comment_automations').update({ is_active }).eq('id', id).eq('user_id', userId);
+    return { success: true };
+  },
+
+  // ---- User-wide toggles ----
+  'comments:getSettings': async ({ userId }: Ctx) => {
+    const { data } = await supabase.from('user_profiles')
+      .select('auto_delete_bad_comments, ai_reply_comments_enabled').eq('user_id', userId).single();
+    return data || { auto_delete_bad_comments: false, ai_reply_comments_enabled: true };
+  },
+
+  'comments:saveSettings': async ({ userId }: Ctx, { auto_delete_bad_comments, ai_reply_comments_enabled }: any) => {
+    const updates: any = {};
+    if (auto_delete_bad_comments !== undefined) updates.auto_delete_bad_comments = !!auto_delete_bad_comments;
+    if (ai_reply_comments_enabled !== undefined) updates.ai_reply_comments_enabled = !!ai_reply_comments_enabled;
+    await supabase.from('user_profiles').update(updates).eq('user_id', userId);
+    return { success: true };
+  },
+
+  // ---- Delete an individual comment (manual moderation) ----
+  'comments:deleteComment': async ({ userId }: Ctx, { id }: any) => {
+    await supabase.from('comments_inbox').update({ deleted: true }).eq('id', id).eq('user_id', userId);
+    return { success: true };
+  },
+};

@@ -100,6 +100,18 @@ export function installWebApi() {
       resumeAI: (convId) => rpc('conversations:resumeAI', { convId }),
     },
 
+    // Comments inbox + automations (mention-bait flow + AI replies + auto-delete bad).
+    comments: {
+      list: (opts) => rpc('comments:list', opts),
+      automations: () => rpc('comments:automations'),
+      saveAutomation: (a) => rpc('comments:saveAutomation', a),
+      deleteAutomation: (id) => rpc('comments:deleteAutomation', { id }),
+      toggleAutomation: (id, is_active) => rpc('comments:toggleAutomation', { id, is_active }),
+      getSettings: () => rpc('comments:getSettings'),
+      saveSettings: (s) => rpc('comments:saveSettings', s),
+      deleteComment: (id) => rpc('comments:deleteComment', { id }),
+    },
+
     telegram: {
       connect: (config) => rpc('telegram:connect', config),
       disconnect: () => rpc('telegram:disconnect'),

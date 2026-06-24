@@ -14,6 +14,7 @@ import { settingsHandlers } from './handlers/settings';
 import { accountHandlers } from './handlers/account';
 import { nashirHandlers } from './handlers/nashir';
 import { notificationsHandlers } from './handlers/notifications';
+import { commentsHandlers } from './handlers/comments';
 import { stubHandlers } from './handlers/stubs';
 
 const app = express();
@@ -30,6 +31,7 @@ registerAll({
   ...accountHandlers,
   ...nashirHandlers,
   ...notificationsHandlers,
+  ...commentsHandlers,
   ...stubHandlers,
 });
 
