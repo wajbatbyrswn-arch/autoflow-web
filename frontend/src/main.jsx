@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
-import Login from './auth/Login'
+import Landing from './auth/Landing'
 import Activate from './auth/Activate'
 import { installWebApi } from './lib/webApi'
 import { supabase } from './lib/supabaseClient'
@@ -54,7 +54,7 @@ function Gate() {
   }, [uid])
 
   if (session === undefined) return <Screen>جارٍ التحميل...</Screen>
-  if (!session) return <Login />
+  if (!session) return <Landing />
 
   if (subError) {
     return (
