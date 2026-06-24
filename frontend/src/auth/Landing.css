@@ -1,3 +1,12 @@
+/* ============ Override global overflow:hidden so the landing can scroll ============ */
+html:has(.landing),
+body:has(.landing),
+#root:has(.landing) {
+  height: auto !important;
+  overflow: auto !important;
+  overflow-x: hidden !important;
+}
+
 /* ============ Base — brand colors from logo (Navy + Green) ============ */
 .landing {
   --navy-900: #0a1430;
