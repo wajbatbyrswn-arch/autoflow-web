@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabaseClient'
+import logoImg from '../assets/logo.jpg'
 import './Landing.css'
 
 const WHATSAPP_LINK = 'https://wa.me/962770748793'
@@ -27,21 +28,22 @@ function useReveal() {
   return [ref, shown]
 }
 
-function Reveal({ children, delay = 0, as = 'div', className = '', style = {} }) {
+function Reveal({ children, delay = 0, className = '', style = {} }) {
   const [ref, shown] = useReveal()
-  const Tag = as
   return (
-    <Tag ref={ref} className={`reveal ${shown ? 'in' : ''} ${className}`} style={{ ...style, transitionDelay: `${delay}ms` }}>
+    <div ref={ref} className={`reveal ${shown ? 'in' : ''} ${className}`} style={{ ...style, transitionDelay: `${delay}ms` }}>
       {children}
-    </Tag>
+    </div>
   )
 }
 
-const PROBLEMS = [
-  { i: '😩', t: 'رسائل تضيع', d: 'زبون كتبلك الساعة 3 صباحاً وما رديت — راح اشترى من غيرك.' },
-  { i: '🔁', t: 'نفس الأسئلة ١٠٠ مرة', d: '"كم السعر؟" "هل متوفر؟" "كم التوصيل؟" — ساعات يومياً تضيع.' },
-  { i: '🤯', t: 'تنقّل بين المنصات', d: 'فيسبوك، إنستا، واتساب، تلغرام — مستحيل تتابعهم كلهم بنفس الوقت.' },
-  { i: '📉', t: 'طلبات بلا متابعة', d: 'الزبون قال "تمام بدي اطلب" والمحادثة ضاعت بين 50 رسالة.' },
+const TABS = [
+  { id: 'home',    label: 'الرئيسية' },
+  { id: 'product', label: 'المنتج' },
+  { id: 'how',     label: 'كيف يعمل' },
+  { id: 'pricing', label: 'الأسعار' },
+  { id: 'reviews', label: 'آراء العملاء' },
+  { id: 'about',   label: 'عنا وتواصل' },
 ]
 
 const FEATURES = [
@@ -53,19 +55,27 @@ const FEATURES = [
   { i: '🔒', t: 'فصل كامل لكل متجر', d: 'بيانات متجرك معزولة تماماً. لا أحد يقدر يشوف محادثاتك أو زبائنك.' },
 ]
 
-const USE_CASES = [
-  { e: '👗', t: 'متاجر الأزياء', d: 'يجاوب على المقاسات، الألوان، الصور، ويسجّل طلب التوصيل تلقائياً.' },
-  { e: '💄', t: 'متاجر العطور ومستحضرات التجميل', d: 'يعرّف الزبون على المنتجات، يقترح بدائل، ويُتمّ البيع.' },
-  { e: '📱', t: 'متاجر الإلكترونيات', d: 'يقارن المواصفات، يجاوب أسئلة تقنية، ويحجز الجهاز.' },
-  { e: '🍰', t: 'محلات الحلويات والمأكولات', d: 'يستقبل الطلبات حسب القائمة، يحسب الإجمالي، ويأخذ بيانات التوصيل.' },
-  { e: '💍', t: 'محلات الإكسسوارات', d: 'يعرض الموديلات، الأسعار، ويتعامل مع طلبات الجملة والمفرد.' },
-  { e: '🏪', t: 'أي متجر بـ instagram أو fb', d: 'لو عندك صفحة وتستقبل طلبات DM — AutoFlow يناسبك مية بالمية.' },
+const PROBLEMS = [
+  { i: '😩', t: 'رسائل تضيع', d: 'زبون كتبلك الساعة 3 صباحاً وما رديت — راح اشترى من غيرك.' },
+  { i: '🔁', t: 'نفس الأسئلة 100 مرة', d: '"كم السعر؟" "هل متوفر؟" — ساعات يومياً تضيع.' },
+  { i: '🤯', t: 'تنقّل بين المنصات', d: 'فيسبوك، إنستا، واتساب، تلغرام — مستحيل تتابعهم.' },
+  { i: '📉', t: 'طلبات بلا متابعة', d: 'الزبون قال "بدي اطلب" والمحادثة ضاعت بين 50 رسالة.' },
 ]
 
-const TESTIMONIALS = [
-  { n: 'أحمد العبد الله', r: 'صاحب متجر عطور — عمّان', t: 'الـ AI ردّ على ٤٧ رسالة ليلة وحدة وأنا نايم. صحيت لقيت ١٢ طلب جديد. حرفياً غيّر حياتي.', a: 'أ' },
-  { n: 'سارة الحوراني', r: 'متجر ملابس نسائية — إربد', t: 'كنت أصرف ٥ ساعات يومياً أرد على رسائل. هلأ صار AutoFlow يردّ عني وأنا بركّز على التصميمات.', a: 'س' },
-  { n: 'محمد القاضي', r: 'متجر إكسسوارات — الزرقاء', t: 'بصراحة ما توقعت ذكي بهالشكل. يفهم اللهجة الأردنية ويتعامل مع الزبون كأنه إنسان فعلاً.', a: 'م' },
+const STEPS = [
+  { n: 1, t: 'سجّل دخول بحساب Google', d: 'ثانية واحدة، بدون كلمة مرور.' },
+  { n: 2, t: 'تواصل معنا عبر واتساب', d: 'فريقنا يربط لك حسابات فيسبوك، إنستغرام، وواتساب خلال 10 دقائق.' },
+  { n: 3, t: 'فعّل اشتراكك', d: 'احصل على كود التفعيل، أدخله، وابدأ البيع التلقائي.' },
+  { n: 4, t: 'نَم بأمان', d: 'الـ AI يشتغل ويرد ويبيع وأنت بالخارج.' },
+]
+
+const USE_CASES = [
+  { e: '👗', t: 'متاجر الأزياء', d: 'يجاوب على المقاسات، الألوان، الصور، ويسجّل طلب التوصيل تلقائياً.' },
+  { e: '💄', t: 'العطور والتجميل', d: 'يعرّف الزبون على المنتجات، يقترح بدائل، ويُتمّ البيع.' },
+  { e: '📱', t: 'الإلكترونيات', d: 'يقارن المواصفات، يجاوب أسئلة تقنية، ويحجز الجهاز.' },
+  { e: '🍰', t: 'الحلويات والمأكولات', d: 'يستقبل الطلبات، يحسب الإجمالي، ويأخذ بيانات التوصيل.' },
+  { e: '💍', t: 'الإكسسوارات', d: 'يعرض الموديلات، الأسعار، ويتعامل مع الجملة والمفرد.' },
+  { e: '🏪', t: 'أي متجر يستقبل DM', d: 'لو عندك صفحة FB أو IG وتستقبل رسائل — AutoFlow يناسبك.' },
 ]
 
 const COMPARE = [
@@ -77,11 +87,10 @@ const COMPARE = [
   { f: 'تحليل الأداء', before: 'لا يوجد', after: 'تقارير حية ذكية' },
 ]
 
-const STEPS = [
-  { n: 1, t: 'سجّل دخول بحساب Google', d: 'ثانية واحدة، بدون كلمة مرور.' },
-  { n: 2, t: 'تواصل معنا عبر واتساب', d: 'فريقنا يربط لك حسابات فيسبوك، إنستغرام، وواتساب خلال 10 دقائق.' },
-  { n: 3, t: 'فعّل اشتراكك', d: 'احصل على كود التفعيل، أدخله، وابدأ البيع التلقائي.' },
-  { n: 4, t: 'نَم بأمان', d: 'الـ AI يشتغل ويرد ويبيع وأنت بالخارج.' },
+const TESTIMONIALS = [
+  { n: 'أحمد العبد الله', r: 'متجر عطور — عمّان', t: 'الـ AI ردّ على 47 رسالة ليلة وحدة وأنا نايم. صحيت لقيت 12 طلب جديد. حرفياً غيّر حياتي.', a: 'أ' },
+  { n: 'سارة الحوراني', r: 'متجر ملابس — إربد', t: 'كنت أصرف 5 ساعات يومياً أرد على رسائل. هلأ AutoFlow يردّ عني وأنا بركّز على التصميمات.', a: 'س' },
+  { n: 'محمد القاضي', r: 'إكسسوارات — الزرقاء', t: 'ما توقعت ذكي بهالشكل. يفهم اللهجة الأردنية ويتعامل مع الزبون كأنه إنسان فعلاً.', a: 'م' },
 ]
 
 const FAQ = [
@@ -91,124 +100,56 @@ const FAQ = [
   { q: 'هل بياناتي آمنة؟', a: 'نعم. كل متجر منفصل تماماً، والمحادثات مشفّرة، والمنصة مبنية على Supabase الأمنية.' },
 ]
 
-export default function Landing() {
-  const [yearScroll, setYearScroll] = useState(0)
-  useEffect(() => {
-    const onScroll = () => setYearScroll(window.scrollY)
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [])
+/* =========================================================
+   TAB SECTIONS
+   ========================================================= */
 
+function HomeTab() {
   return (
-    <div className="landing">
-      {/* Animated background */}
-      <div className="bg-orbs">
-        <div className="orb orb-1" />
-        <div className="orb orb-2" />
-        <div className="orb orb-3" />
-      </div>
-
-      {/* Header */}
-      <header className="lp-header">
-        <div className="lp-container lp-header-inner">
-          <div className="lp-brand">
-            <div className="lp-brand-mark">A</div>
-            <span className="lp-brand-text">AutoFlow</span>
-          </div>
-          <nav className="lp-nav">
-            <a href="#features">المميزات</a>
-            <a href="#how">كيف يعمل</a>
-            <a href="#pricing">الأسعار</a>
-            <a href="#contact">تواصل</a>
-          </nav>
-          <button className="lp-btn lp-btn-primary" onClick={loginGoogle}>
-            تسجيل الدخول
-          </button>
-        </div>
-      </header>
-
-      {/* Hero */}
+    <>
       <section className="hero">
-        <div className="lp-container">
-          <Reveal>
-            <span className="hero-badge">
-              <span className="dot-pulse" />
-              منصة عربية بالكامل · مدعومة بـ AI
-            </span>
-          </Reveal>
-          <Reveal delay={100}>
-            <h1 className="hero-title">
-              متجرك يبيع <span className="grad">حتى وأنت نائم</span>
-              <br/>بفضل الذكاء الاصطناعي
-            </h1>
-          </Reveal>
-          <Reveal delay={200}>
-            <p className="hero-sub">
-              AutoFlow هو موظف المبيعات الذكي اللي يرد على كل رسالة من زبائنك تلقائياً، يجمع البيانات، يؤكّد الطلب،
-              ويسجّله في لوحة التحكم — على فيسبوك، إنستغرام، واتساب، وتلغرام دفعة وحدة.
-            </p>
-          </Reveal>
-          <Reveal delay={300}>
-            <div className="hero-cta">
-              <button className="lp-btn lp-btn-primary lp-btn-lg" onClick={loginGoogle}>
-                ابدأ الآن مجاناً ←
-              </button>
-              <a href="#features" className="lp-btn lp-btn-ghost lp-btn-lg">شاهد المميزات</a>
-            </div>
-          </Reveal>
-          <Reveal delay={400}>
-            <div className="hero-trust">
-              <span>✓ بدون بطاقة دفع</span>
-              <span>✓ ربط خلال 10 دقائق</span>
-              <span>✓ دعم عربي مباشر</span>
-            </div>
-          </Reveal>
-
-          {/* Floating mock dashboard */}
-          <Reveal delay={500}>
-            <div className="hero-mock" style={{ transform: `translateY(${yearScroll * -0.04}px)` }}>
-              <div className="mock-window">
-                <div className="mock-bar">
-                  <span className="mock-dot red"></span>
-                  <span className="mock-dot yellow"></span>
-                  <span className="mock-dot green"></span>
-                  <span className="mock-url">autoflowchat.shop/dashboard</span>
-                </div>
-                <div className="mock-body">
-                  <div className="mock-side">
-                    <div className="mock-item active">📊 لوحة التحكم</div>
-                    <div className="mock-item">💬 المحادثات <span className="mock-badge">12</span></div>
-                    <div className="mock-item">🛒 الطلبات <span className="mock-badge">5</span></div>
-                    <div className="mock-item">📈 التقارير</div>
-                  </div>
-                  <div className="mock-content">
-                    <div className="mock-stats">
-                      <div className="mock-stat">
-                        <div className="mock-stat-l">إيرادات اليوم</div>
-                        <div className="mock-stat-v">٢٤٠ د.أ</div>
-                        <div className="mock-stat-up">↑ ١٢٪</div>
-                      </div>
-                      <div className="mock-stat">
-                        <div className="mock-stat-l">طلبات جديدة</div>
-                        <div className="mock-stat-v">١٨</div>
-                        <div className="mock-stat-up">↑ ٨٪</div>
-                      </div>
-                      <div className="mock-stat">
-                        <div className="mock-stat-l">رسائل اليوم</div>
-                        <div className="mock-stat-v">١٢٣</div>
-                        <div className="mock-stat-up">↑ ٢٢٪</div>
-                      </div>
-                    </div>
-                    <div className="mock-chat">
-                      <div className="mock-msg in">مرحبا، بدي معلومات عن العطر</div>
-                      <div className="mock-msg out">أهلاً! عندنا عدة أنواع، حضرتك بتفضل عطر شرقي أو غربي؟ 🌹</div>
-                      <div className="mock-msg in">شرقي</div>
-                      <div className="mock-msg out">رائع! اخترنا لحضرتك "عبير العود" بـ ٣٥ دينار. بدك تأكيد الطلب؟ ✨</div>
-                      <div className="mock-typing"><span></span><span></span><span></span></div>
-                    </div>
-                  </div>
-                </div>
+        <div className="lp-container hero-grid">
+          <div className="hero-text">
+            <Reveal>
+              <span className="hero-badge">
+                <span className="dot-pulse" />
+                منصة عربية بالكامل · مدعومة بـ AI
+              </span>
+            </Reveal>
+            <Reveal delay={100}>
+              <h1 className="hero-title">
+                متجرك يبيع <span className="grad">حتى وأنت نائم</span>
+              </h1>
+            </Reveal>
+            <Reveal delay={200}>
+              <p className="hero-sub">
+                AutoFlow Chat هو موظف المبيعات الذكي اللي يرد على كل رسالة من زبائنك تلقائياً،
+                يجمع البيانات، يؤكّد الطلب، ويسجّله في لوحة التحكم — على فيسبوك، إنستغرام، واتساب، وتلغرام دفعة وحدة.
+              </p>
+            </Reveal>
+            <Reveal delay={300}>
+              <div className="hero-cta">
+                <button className="lp-btn lp-btn-primary lp-btn-lg" onClick={loginGoogle}>
+                  ابدأ الآن مجاناً ←
+                </button>
+                <a href={WHATSAPP_LINK} target="_blank" rel="noreferrer" className="lp-btn lp-btn-ghost lp-btn-lg">
+                  تواصل واتساب
+                </a>
               </div>
+            </Reveal>
+            <Reveal delay={400}>
+              <div className="hero-trust">
+                <span>✓ بدون بطاقة دفع</span>
+                <span>✓ ربط خلال 10 دقائق</span>
+                <span>✓ دعم عربي مباشر</span>
+              </div>
+            </Reveal>
+          </div>
+
+          <Reveal delay={150} className="hero-visual">
+            <div className="hero-logo-wrap">
+              <div className="hero-logo-ring" />
+              <img src={logoImg} alt="AutoFlow Chat" className="hero-logo-img" />
             </div>
           </Reveal>
         </div>
@@ -229,17 +170,22 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Stats */}
+      {/* Quick stats */}
       <section className="stats-strip">
         <div className="lp-container stats-grid">
-          <Reveal delay={0}><div className="stat"><div className="stat-n">٤</div><div className="stat-l">منصات مدعومة</div></div></Reveal>
-          <Reveal delay={80}><div className="stat"><div className="stat-n">٢٤/٧</div><div className="stat-l">رد فوري</div></div></Reveal>
-          <Reveal delay={160}><div className="stat"><div className="stat-n">١٠د</div><div className="stat-l">للربط الكامل</div></div></Reveal>
-          <Reveal delay={240}><div className="stat"><div className="stat-n">+٩٠٪</div><div className="stat-l">رضا الزبائن</div></div></Reveal>
+          <Reveal delay={0}><div className="stat"><div className="stat-n">4</div><div className="stat-l">منصات مدعومة</div></div></Reveal>
+          <Reveal delay={80}><div className="stat"><div className="stat-n">24/7</div><div className="stat-l">رد فوري</div></div></Reveal>
+          <Reveal delay={160}><div className="stat"><div className="stat-n">10د</div><div className="stat-l">للربط الكامل</div></div></Reveal>
+          <Reveal delay={240}><div className="stat"><div className="stat-n">+90%</div><div className="stat-l">رضا الزبائن</div></div></Reveal>
         </div>
       </section>
+    </>
+  )
+}
 
-      {/* Problems */}
+function ProductTab() {
+  return (
+    <>
       <section className="problems">
         <div className="lp-container">
           <Reveal><div className="section-eyebrow pain">المشاكل اللي بتواجهك</div></Reveal>
@@ -257,12 +203,11 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Features */}
       <section id="features" className="features">
         <div className="lp-container">
           <Reveal><div className="section-eyebrow">المميزات</div></Reveal>
           <Reveal delay={60}><h2 className="section-title">كل اللي تحتاجه لإدارة متجرك في مكان واحد</h2></Reveal>
-          <Reveal delay={120}><p className="section-sub">من استقبال أول رسالة لحدّ تسجيل الطلب — AutoFlow يتولّى كل شي.</p></Reveal>
+          <Reveal delay={120}><p className="section-sub">من استقبال أول رسالة لحدّ تسجيل الطلب — AutoFlow Chat يتولّى كل شي.</p></Reveal>
 
           <div className="features-grid">
             {FEATURES.map((f, i) => (
@@ -275,12 +220,17 @@ export default function Landing() {
           </div>
         </div>
       </section>
+    </>
+  )
+}
 
-      {/* How it works */}
-      <section id="how" className="how">
+function HowTab() {
+  return (
+    <>
+      <section className="how">
         <div className="lp-container">
           <Reveal><div className="section-eyebrow">كيف يعمل</div></Reveal>
-          <Reveal delay={60}><h2 className="section-title">٤ خطوات وبتصير تبيع تلقائياً</h2></Reveal>
+          <Reveal delay={60}><h2 className="section-title">4 خطوات وبتصير تبيع تلقائياً</h2></Reveal>
 
           <div className="steps">
             {STEPS.map((s, i) => (
@@ -296,67 +246,6 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Pricing */}
-      <section id="pricing" className="pricing">
-        <div className="lp-container">
-          <Reveal><div className="section-eyebrow">الأسعار</div></Reveal>
-          <Reveal delay={60}><h2 className="section-title">خطة واحدة بسيطة، كل المميزات</h2></Reveal>
-
-          <Reveal delay={120} className="price-card-wrap">
-            <div className="price-card">
-              <div className="price-badge">الأكثر طلباً</div>
-              <h3 className="price-name">الخطة الشهرية</h3>
-              <div className="price-amount">
-                <span className="price-num">٢٥</span>
-                <span className="price-cur">د.أ</span>
-                <span className="price-per">/شهر</span>
-              </div>
-              <ul className="price-list">
-                <li>✓ ربط فيسبوك + إنستغرام + واتساب + تلغرام</li>
-                <li>✓ موظف ذكي يرد 24/7 بنفس لغة العميل</li>
-                <li>✓ صندوق وارد موحّد + تحويل الطلبات تلقائياً</li>
-                <li>✓ تقارير وتحليلات متقدمة</li>
-                <li>✓ مولّد بوستات احترافي بـ AI</li>
-                <li>✓ ربط حساباتك خلال 10 دقائق</li>
-                <li>✓ دعم فني عبر واتساب</li>
-              </ul>
-              <button className="lp-btn lp-btn-primary lp-btn-lg lp-w-full" onClick={loginGoogle}>
-                ابدأ الآن ←
-              </button>
-              <p className="price-note">ألغِ متى ما أردت · بدون التزامات</p>
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* About */}
-      <section id="about" className="about">
-        <div className="lp-container about-grid">
-          <Reveal>
-            <div className="about-text">
-              <div className="section-eyebrow">من نحن</div>
-              <h2 className="section-title">فريق أردني يبني أدوات تخدم التجار العرب</h2>
-              <p className="section-sub">
-                AutoFlow أُسس بهدف واحد: نوفّر للتاجر الصغير والمتوسط أداة قوية كان يستحيل بناءها لوحده.
-                نحن لا نبيع برنامج — نبيع راحة بال وزيادة في المبيعات وفريق صامت يشتغل عنك ٢٤ ساعة.
-              </p>
-              <p className="section-sub">
-                مقرّنا في الأردن، وزبائننا في كل الوطن العربي. نتكلم عربي، نفهم لهجاتكم، ونعرف تحديات السوق المحلي.
-              </p>
-            </div>
-          </Reveal>
-          <Reveal delay={150}>
-            <div className="about-stats">
-              <div className="about-stat"><div className="as-n">٢٠٢٦</div><div className="as-l">تأسست</div></div>
-              <div className="about-stat"><div className="as-n">🇯🇴</div><div className="as-l">صناعة أردنية</div></div>
-              <div className="about-stat"><div className="as-n">+٠</div><div className="as-l">سعداء بخدمتك أول</div></div>
-              <div className="about-stat"><div className="as-n">∞</div><div className="as-l">تحديثات مستمرة</div></div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* Use cases */}
       <section className="use-cases">
         <div className="lp-container">
           <Reveal><div className="section-eyebrow">لمن يناسب؟</div></Reveal>
@@ -373,8 +262,49 @@ export default function Landing() {
           </div>
         </div>
       </section>
+    </>
+  )
+}
 
-      {/* Before/After comparison */}
+function PricingTab() {
+  return (
+    <section className="pricing">
+      <div className="lp-container">
+        <Reveal><div className="section-eyebrow center">الأسعار</div></Reveal>
+        <Reveal delay={60}><h2 className="section-title center">خطة واحدة بسيطة، كل المميزات</h2></Reveal>
+
+        <Reveal delay={120} className="price-card-wrap">
+          <div className="price-card">
+            <div className="price-badge">الأكثر طلباً</div>
+            <h3 className="price-name">الخطة الشهرية</h3>
+            <div className="price-amount">
+              <span className="price-num">25</span>
+              <span className="price-cur">د.أ</span>
+              <span className="price-per">/شهر</span>
+            </div>
+            <ul className="price-list">
+              <li>✓ ربط فيسبوك + إنستغرام + واتساب + تلغرام</li>
+              <li>✓ موظف ذكي يرد 24/7 بنفس لغة العميل</li>
+              <li>✓ صندوق وارد موحّد + تحويل الطلبات تلقائياً</li>
+              <li>✓ تقارير وتحليلات متقدمة</li>
+              <li>✓ مولّد بوستات احترافي بـ AI</li>
+              <li>✓ ربط حساباتك خلال 10 دقائق</li>
+              <li>✓ دعم فني عبر واتساب</li>
+            </ul>
+            <button className="lp-btn lp-btn-primary lp-btn-lg lp-w-full" onClick={loginGoogle}>
+              ابدأ الآن ←
+            </button>
+            <p className="price-note">ألغِ متى ما أردت · بدون التزامات</p>
+          </div>
+        </Reveal>
+      </div>
+    </section>
+  )
+}
+
+function ReviewsTab() {
+  return (
+    <>
       <section className="compare">
         <div className="lp-container">
           <Reveal><div className="section-eyebrow">قبل / بعد</div></Reveal>
@@ -399,10 +329,9 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Testimonials */}
       <section className="testimonials">
         <div className="lp-container">
-          <Reveal><div className="section-eyebrow">ماذا يقول عملاؤنا</div></Reveal>
+          <Reveal><div className="section-eyebrow">آراء العملاء</div></Reveal>
           <Reveal delay={60}><h2 className="section-title">تجارب حقيقية من تجار حقيقيين</h2></Reveal>
           <div className="testi-grid">
             {TESTIMONIALS.map((t, i) => (
@@ -421,8 +350,37 @@ export default function Landing() {
           </div>
         </div>
       </section>
+    </>
+  )
+}
 
-      {/* FAQ */}
+function AboutTab() {
+  return (
+    <>
+      <section className="about">
+        <div className="lp-container about-grid">
+          <Reveal className="about-text">
+            <div className="section-eyebrow">من نحن</div>
+            <h2 className="section-title">فريق أردني يبني أدوات تخدم التجار العرب</h2>
+            <p className="section-sub">
+              AutoFlow Chat أُسس بهدف واحد: نوفّر للتاجر الصغير والمتوسط أداة قوية كان يستحيل بناءها لوحده.
+              نحن لا نبيع برنامج — نبيع راحة بال وزيادة في المبيعات وفريق صامت يشتغل عنك ٢٤ ساعة.
+            </p>
+            <p className="section-sub">
+              مقرّنا في الأردن، وزبائننا في كل الوطن العربي. نتكلم عربي، نفهم لهجاتكم، ونعرف تحديات السوق المحلي.
+            </p>
+          </Reveal>
+          <Reveal delay={150}>
+            <div className="about-stats">
+              <div className="about-stat"><div className="as-n">2026</div><div className="as-l">تأسست</div></div>
+              <div className="about-stat"><div className="as-n">🇯🇴</div><div className="as-l">صناعة أردنية</div></div>
+              <div className="about-stat"><div className="as-n">+0</div><div className="as-l">سعداء بخدمتك أول</div></div>
+              <div className="about-stat"><div className="as-n">∞</div><div className="as-l">تحديثات مستمرة</div></div>
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
       <section className="faq">
         <div className="lp-container">
           <Reveal><div className="section-eyebrow">أسئلة شائعة</div></Reveal>
@@ -441,13 +399,12 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Contact / Final CTA */}
-      <section id="contact" className="contact-cta">
+      <section className="contact-cta">
         <div className="lp-container">
           <Reveal>
             <div className="cta-box">
               <h2>جاهز تبدأ؟</h2>
-              <p>سجّل دخول بثانية وفريقنا يربط لك كل شي خلال ١٠ دقائق.</p>
+              <p>سجّل دخول بثانية وفريقنا يربط لك كل شي خلال 10 دقائق.</p>
               <div className="cta-actions">
                 <button className="lp-btn lp-btn-primary lp-btn-lg" onClick={loginGoogle}>
                   ابدأ الآن مجاناً ←
@@ -462,17 +419,68 @@ export default function Landing() {
           </Reveal>
         </div>
       </section>
+    </>
+  )
+}
 
-      {/* Footer */}
+const TAB_COMPONENTS = {
+  home: HomeTab,
+  product: ProductTab,
+  how: HowTab,
+  pricing: PricingTab,
+  reviews: ReviewsTab,
+  about: AboutTab,
+}
+
+export default function Landing() {
+  const [active, setActive] = useState('home')
+  const ActiveTab = TAB_COMPONENTS[active] || HomeTab
+
+  useEffect(() => {
+    // Scroll to top when tab changes for a clean section reveal.
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [active])
+
+  return (
+    <div className="landing">
+      <header className="lp-header">
+        <div className="lp-container lp-header-inner">
+          <div className="lp-brand">
+            <img src={logoImg} alt="AutoFlow Chat" className="lp-brand-logo" />
+            <span className="lp-brand-text">AutoFlow Chat</span>
+          </div>
+
+          <nav className="lp-tabs" role="tablist">
+            {TABS.map(t => (
+              <button
+                key={t.id}
+                role="tab"
+                aria-selected={active === t.id}
+                className={`lp-tab ${active === t.id ? 'active' : ''}`}
+                onClick={() => setActive(t.id)}
+              >
+                {t.label}
+              </button>
+            ))}
+          </nav>
+
+          <button className="lp-btn lp-btn-primary" onClick={loginGoogle}>
+            تسجيل الدخول
+          </button>
+        </div>
+      </header>
+
+      <main className="lp-main" key={active}>
+        <ActiveTab />
+      </main>
+
       <footer className="lp-footer">
         <div className="lp-container lp-footer-inner">
           <div className="lp-brand">
-            <div className="lp-brand-mark">A</div>
-            <span className="lp-brand-text">AutoFlow</span>
+            <img src={logoImg} alt="AutoFlow Chat" className="lp-brand-logo sm" />
+            <span className="lp-brand-text">AutoFlow Chat</span>
           </div>
-          <div className="lp-footer-text">
-            © 2026 AutoFlow · صُنع في 🇯🇴 الأردن
-          </div>
+          <div className="lp-footer-text">© 2026 AutoFlow Chat · صُنع في 🇯🇴 الأردن</div>
           <div className="lp-footer-links">
             <a href={WHATSAPP_LINK} target="_blank" rel="noreferrer">واتساب</a>
             <a href={FACEBOOK_LINK} target="_blank" rel="noreferrer">فيسبوك</a>
