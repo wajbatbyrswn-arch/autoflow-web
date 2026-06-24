@@ -149,6 +149,47 @@ export const notificationsHandlers = {
     }
   },
 
+  /**
+   * Discover chats/channels/groups where the bot has been added.
+   * Telegram doesn't expose "list my chats", so we rely on getUpdates which
+   * surfaces every channel_post / my_chat_member event seen recently.
+   * The user is instructed to: add the bot as admin → send any message in the channel
+   * → press refresh here.
+   */
+  'telegram:listChats': async ({ userId }: Ctx) => {
+    const { data } = await supabase.from('user_profiles').select('telegram_bot_token').eq('user_id', userId).single();
+    const token = data?.telegram_bot_token;
+    if (!token) return { success: false, error: 'لم يتم حفظ توكن البوت', chats: [] };
+    try {
+      const res = await axios.get(`https://api.telegram.org/bot${token}/getUpdates`, {
+        params: {
+          // Without allowed_updates the bot won't see channel_post or my_chat_member events.
+          allowed_updates: JSON.stringify(['message', 'channel_post', 'my_chat_member', 'chat_member']),
+          limit: 100,
+        },
+        timeout: 10000,
+      });
+      const updates = res.data?.result || [];
+      const chatsMap = new Map();
+      for (const u of updates) {
+        const chat = u.message?.chat || u.channel_post?.chat
+          || u.my_chat_member?.chat || u.chat_member?.chat
+          || u.edited_message?.chat || u.edited_channel_post?.chat;
+        if (chat && !chatsMap.has(String(chat.id))) {
+          chatsMap.set(String(chat.id), {
+            id: String(chat.id),
+            type: chat.type, // 'private' | 'group' | 'supergroup' | 'channel'
+            title: chat.title || chat.username || [chat.first_name, chat.last_name].filter(Boolean).join(' ') || `Chat ${chat.id}`,
+            username: chat.username || null,
+          });
+        }
+      }
+      return { success: true, chats: Array.from(chatsMap.values()) };
+    } catch (e: any) {
+      return { success: false, error: e?.response?.data?.description || e?.message || 'فشل الجلب', chats: [] };
+    }
+  },
+
   'telegram:sendTest': async ({ userId }: Ctx) => {
     const { data } = await supabase.from('user_profiles')
       .select('telegram_bot_token, admin_telegram_chat_id, full_name, email').eq('user_id', userId).single();

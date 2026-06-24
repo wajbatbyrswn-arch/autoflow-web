@@ -102,6 +102,26 @@ export default function Settings() {
   const [tgBotInfo, setTgBotInfo] = useState(null)
   const [tgSaving, setTgSaving] = useState(false)
   const [tgTesting, setTgTesting] = useState(false)
+  const [tgChats, setTgChats] = useState([])         // [{id,type,title,username}]
+  const [tgFetchingChats, setTgFetchingChats] = useState(false)
+
+  async function fetchTgChats() {
+    setTgFetchingChats(true)
+    try {
+      const res = await rpc('telegram:listChats')
+      if (res?.success) {
+        setTgChats(res.chats || [])
+        if (!res.chats?.length) {
+          toast('ما في قنوات بعد — أضف البوت كأدمن لقناتك ثم أرسل أي رسالة فيها، ثم اضغط تحديث.', { duration: 6000, icon: 'ℹ️' })
+        } else {
+          toast.success(`تم جلب ${res.chats.length} قناة/جروب`)
+        }
+      } else {
+        toast.error(res?.error || 'فشل الجلب')
+      }
+    } catch (e) { toast.error(e.message) }
+    setTgFetchingChats(false)
+  }
 
   async function loadTgStatus() {
     try {
@@ -648,22 +668,57 @@ export default function Settings() {
                 </>
               )}
 
-              {/* Chat ID — required for sending */}
-              <div className="input-group" style={{marginTop:14}}>
-                <label className="input-label">2. معرف القناة/الجروب (Chat ID)</label>
-                <div style={{display:'flex', gap:6}}>
-                  <input className="input" dir="ltr" style={{flex:1, fontFamily:'monospace'}}
-                    placeholder="-1001234567890 أو 123456789" value={tgChatId}
-                    onChange={e => setTgChatId(e.target.value)} />
-                  <button className="btn btn-primary" onClick={saveTgChat} disabled={!tgChatId.trim()}>
-                    حفظ
-                  </button>
+              {/* Chat selector — required for sending */}
+              {tgBotInfo && (
+                <div className="input-group" style={{marginTop:14}}>
+                  <label className="input-label">2. اختر القناة/الجروب الذي ستصل عليه الإشعارات</label>
+
+                  <div style={{background:'rgba(34,158,217,0.07)', border:'1px dashed rgba(34,158,217,0.3)', borderRadius:10, padding:'10px 14px', fontSize:12, lineHeight:1.9, marginBottom:10, color:'var(--text-secondary)'}}>
+                    <strong style={{color:'var(--text)'}}>كيف تربط قناتك؟</strong><br/>
+                    1) افتح قناتك/جروبك على تلغرام.<br/>
+                    2) أضف البوت <strong style={{color:'#34d399'}}>@{tgBotInfo.username}</strong> كأدمن.<br/>
+                    3) أرسل أي رسالة (مثل "مرحبا") داخل القناة.<br/>
+                    4) اضغط زر "تحديث القنوات" أدناه.
+                  </div>
+
+                  <div style={{display:'flex', gap:6, marginBottom:10}}>
+                    <button className="btn btn-secondary" style={{flex:1}} onClick={fetchTgChats} disabled={tgFetchingChats}>
+                      {tgFetchingChats ? 'جارٍ الجلب...' : '🔄 تحديث قائمة القنوات'}
+                    </button>
+                  </div>
+
+                  {tgChats.length > 0 ? (
+                    <>
+                      <select className="input" value={tgChatId} onChange={e => setTgChatId(e.target.value)} style={{marginBottom:8}}>
+                        <option value="">— اختر قناة أو جروب —</option>
+                        {tgChats.map(c => {
+                          const typeLabel = c.type === 'channel' ? '📢 قناة'
+                            : c.type === 'group' || c.type === 'supergroup' ? '👥 جروب'
+                            : c.type === 'private' ? '👤 خاص' : c.type
+                          return (
+                            <option key={c.id} value={c.id}>
+                              {typeLabel} — {c.title}{c.username ? ` (@${c.username})` : ''}
+                            </option>
+                          )
+                        })}
+                      </select>
+                      <button className="btn btn-primary" style={{width:'100%'}} onClick={saveTgChat} disabled={!tgChatId}>
+                        💾 حفظ الاختيار
+                      </button>
+                    </>
+                  ) : (
+                    <div style={{textAlign:'center', padding:'14px', opacity:0.6, fontSize:13, background:'var(--glass-bg)', borderRadius:10, border:'1px dashed var(--border-color)'}}>
+                      لا توجد قنوات بعد. اتبع الخطوات أعلاه ثم اضغط "تحديث".
+                    </div>
+                  )}
+
+                  {tgChatId && (
+                    <div style={{marginTop:10, fontSize:11, opacity:0.6, fontFamily:'monospace', direction:'ltr', textAlign:'right'}}>
+                      Chat ID المحفوظ: {tgChatId}
+                    </div>
+                  )}
                 </div>
-                <div className="input-hint">
-                  للقنوات/الجروبات الخاصة: أضف البوت كأدمن في القناة، ثم أرسل /start في @userinfobot لمعرفة الـ ID.
-                  معرفات القنوات تبدأ بـ -100
-                </div>
-              </div>
+              )}
 
               {/* Test button */}
               {tgBotInfo && tgChatId && (
