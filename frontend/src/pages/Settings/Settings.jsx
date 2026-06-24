@@ -733,8 +733,7 @@ export default function Settings() {
             </div>
 
             {/* ===== Legacy email/notification settings ===== */}
-            <div className="card animate-fade">
-          <div className="card animate-fade">
+            <div className="card">
             <div className="card-title">إعدادات الإشعارات وتنبيهات الإدارة</div>
             <div className="input-group" style={{marginBottom:20}}>
               <label className="input-label">طريقة الإرسال المفضلة</label>
