@@ -357,30 +357,87 @@ function ReviewsTab() {
 function AboutTab() {
   return (
     <>
-      <section className="about">
-        <div className="lp-container about-grid">
-          <Reveal className="about-text">
-            <div className="section-eyebrow">من نحن</div>
-            <h2 className="section-title">فريق أردني يبني أدوات تخدم التجار العرب</h2>
-            <p className="section-sub">
-              AutoFlow Chat أُسس بهدف واحد: نوفّر للتاجر الصغير والمتوسط أداة قوية كان يستحيل بناءها لوحده.
-              نحن لا نبيع برنامج — نبيع راحة بال وزيادة في المبيعات وفريق صامت يشتغل عنك ٢٤ ساعة.
-            </p>
-            <p className="section-sub">
-              مقرّنا في الأردن، وزبائننا في كل الوطن العربي. نتكلم عربي، نفهم لهجاتكم، ونعرف تحديات السوق المحلي.
-            </p>
-          </Reveal>
-          <Reveal delay={150}>
-            <div className="about-stats">
-              <div className="about-stat"><div className="as-n">2026</div><div className="as-l">تأسست</div></div>
-              <div className="about-stat"><div className="as-n">🇯🇴</div><div className="as-l">صناعة أردنية</div></div>
-              <div className="about-stat"><div className="as-n">+0</div><div className="as-l">سعداء بخدمتك أول</div></div>
-              <div className="about-stat"><div className="as-n">∞</div><div className="as-l">تحديثات مستمرة</div></div>
-            </div>
-          </Reveal>
+      {/* Big prominent contact cards */}
+      <section className="contact-section">
+        <div className="lp-container">
+          <Reveal><div className="section-eyebrow center">تواصل معنا</div></Reveal>
+          <Reveal delay={60}><h2 className="section-title center">نحن هنا لمساعدتك خلال دقائق</h2></Reveal>
+          <Reveal delay={120}><p className="section-sub center">اختر القناة الأنسب لك. فريقنا يردّ عادةً خلال 30 دقيقة من 9 صباحاً حتى 11 مساءً (بتوقيت الأردن).</p></Reveal>
+
+          <div className="contact-grid">
+            <Reveal delay={0}>
+              <a href={WHATSAPP_LINK} target="_blank" rel="noreferrer" className="contact-card wa">
+                <div className="contact-ico" style={{background:'#25D366'}}>
+                  <svg viewBox="0 0 32 32" width="34" height="34" fill="#fff"><path d="M16 .4a15.6 15.6 0 0 0-13.3 23.7L.4 31.6l7.7-2.2A15.6 15.6 0 1 0 16 .4Zm0 28.5a12.8 12.8 0 0 1-6.6-1.8l-.5-.3-4.6 1.3 1.3-4.4-.3-.5a12.9 12.9 0 1 1 10.7 5.7Zm7.3-9.7c-.4-.2-2.4-1.2-2.7-1.3-.4-.1-.7-.2-1 .2-.3.4-1.1 1.3-1.4 1.6-.2.3-.5.3-.9.1a10.5 10.5 0 0 1-5.2-4.5c-.4-.7.4-.6 1.1-2 .1-.3 0-.5 0-.7 0-.2-.9-2.2-1.3-3-.3-.8-.7-.7-1-.7h-.8c-.3 0-.8.1-1.2.6-.4.5-1.6 1.6-1.6 3.8 0 2.3 1.6 4.5 1.9 4.8.2.3 3.3 5 8 7 3 .8 4.2.9 5.7.7.9-.1 2.4-1 2.7-2 .4-1 .4-1.8.3-2 0-.1-.4-.3-.8-.5Z"/></svg>
+                </div>
+                <h3>واتساب</h3>
+                <div className="contact-detail" dir="ltr">+962 7 7074 8793</div>
+                <p>أسرع وأبسط طريقة للتواصل. رد فوري خلال دقائق.</p>
+                <span className="contact-action" style={{background:'#25D366'}}>افتح محادثة</span>
+              </a>
+            </Reveal>
+
+            <Reveal delay={100}>
+              <a href={FACEBOOK_LINK} target="_blank" rel="noreferrer" className="contact-card fb">
+                <div className="contact-ico" style={{background:'#1877F2'}}>
+                  <svg viewBox="0 0 24 24" width="32" height="32" fill="#fff"><path d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07c0 6.03 4.39 11.02 10.13 11.93v-8.43H7.08v-3.5h3.05V9.41c0-3.02 1.79-4.69 4.53-4.69 1.31 0 2.69.23 2.69.23v2.97h-1.52c-1.49 0-1.96.93-1.96 1.89v2.27h3.33l-.53 3.5h-2.8V24C19.61 23.09 24 18.1 24 12.07Z"/></svg>
+                </div>
+                <h3>فيسبوك</h3>
+                <div className="contact-detail">صفحتنا الرسمية</div>
+                <p>تابع آخر الأخبار، التحديثات، وأفكار التسويق على فيسبوك.</p>
+                <span className="contact-action" style={{background:'#1877F2'}}>زيارة الصفحة</span>
+              </a>
+            </Reveal>
+
+            <Reveal delay={200}>
+              <a href={INSTAGRAM_LINK} target="_blank" rel="noreferrer" className="contact-card ig">
+                <div className="contact-ico" style={{background:'linear-gradient(135deg,#E4405F,#C13584,#F5A623)'}}>
+                  <svg viewBox="0 0 24 24" width="32" height="32" fill="#fff"><path d="M12 2.16c3.2 0 3.58.01 4.85.07 1.17.05 1.8.25 2.23.41.56.22.96.48 1.38.9.42.42.68.82.9 1.38.16.42.36 1.06.41 2.23.06 1.27.07 1.65.07 4.85s-.01 3.58-.07 4.85c-.05 1.17-.25 1.8-.41 2.23-.22.56-.48.96-.9 1.38-.42.42-.82.68-1.38.9-.42.16-1.06.36-2.23.41-1.27.06-1.65.07-4.85.07s-3.58-.01-4.85-.07c-1.17-.05-1.8-.25-2.23-.41a3.7 3.7 0 0 1-1.38-.9 3.7 3.7 0 0 1-.9-1.38c-.16-.42-.36-1.06-.41-2.23-.06-1.27-.07-1.65-.07-4.85s.01-3.58.07-4.85c.05-1.17.25-1.8.41-2.23.22-.56.48-.96.9-1.38.42-.42.82-.68 1.38-.9.42-.16 1.06-.36 2.23-.41 1.27-.06 1.65-.07 4.85-.07ZM12 0C8.74 0 8.33.01 7.05.07c-1.28.06-2.15.26-2.91.55a5.88 5.88 0 0 0-2.13 1.39A5.88 5.88 0 0 0 .62 4.14C.33 4.9.13 5.77.07 7.05.01 8.33 0 8.74 0 12s.01 3.67.07 4.95c.06 1.28.26 2.15.55 2.91a5.88 5.88 0 0 0 1.39 2.13 5.88 5.88 0 0 0 2.13 1.39c.76.29 1.63.49 2.91.55C8.33 23.99 8.74 24 12 24s3.67-.01 4.95-.07c1.28-.06 2.15-.26 2.91-.55a5.88 5.88 0 0 0 2.13-1.39 5.88 5.88 0 0 0 1.39-2.13c.29-.76.49-1.63.55-2.91.06-1.28.07-1.69.07-4.95s-.01-3.67-.07-4.95c-.06-1.28-.26-2.15-.55-2.91a5.88 5.88 0 0 0-1.39-2.13A5.88 5.88 0 0 0 19.86.62C19.1.33 18.23.13 16.95.07 15.67.01 15.26 0 12 0Zm0 5.84A6.16 6.16 0 1 0 12 18.16 6.16 6.16 0 0 0 12 5.84Zm0 10.16a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm6.4-11.85a1.44 1.44 0 1 0 0 2.88 1.44 1.44 0 0 0 0-2.88Z"/></svg>
+                </div>
+                <h3>إنستغرام</h3>
+                <div className="contact-detail" dir="ltr">@auto_flowran</div>
+                <p>شاهد لقطات من المنصة، شهادات العملاء، ومحتوى تعليمي يومي.</p>
+                <span className="contact-action" style={{background:'linear-gradient(135deg,#E4405F,#C13584)'}}>متابعة الحساب</span>
+              </a>
+            </Reveal>
+          </div>
         </div>
       </section>
 
+      {/* About / Mission */}
+      <section className="about">
+        <div className="lp-container">
+          <Reveal><div className="section-eyebrow">من نحن</div></Reveal>
+          <Reveal delay={60}><h2 className="section-title">فريق متخصّص في أتمتة المبيعات للتجار العرب</h2></Reveal>
+          <Reveal delay={120}>
+            <p className="section-sub" style={{maxWidth:820}}>
+              AutoFlow Chat منصة مبنية على تقنيات الذكاء الاصطناعي الحديثة لتمكين أصحاب المتاجر الإلكترونية
+              من إدارة محادثات زبائنهم وتحويلها إلى مبيعات بشكل تلقائي وآمن. نؤمن أن التاجر يستحق أداة قوية تحرّر وقته
+              وتنمّي دخله بدون تعقيد تقني.
+            </p>
+          </Reveal>
+
+          <div className="values-grid">
+            <Reveal delay={0} className="value-card">
+              <div className="value-ico">🎯</div>
+              <h3>مهمتنا</h3>
+              <p>تمكين كل تاجر صغير ومتوسط في الوطن العربي من امتلاك موظف مبيعات ذكي بتكلفة معقولة، وبدون أي خبرة تقنية.</p>
+            </Reveal>
+            <Reveal delay={100} className="value-card">
+              <div className="value-ico">👁</div>
+              <h3>رؤيتنا</h3>
+              <p>أن نصبح المنصة الأولى عربياً لأتمتة خدمة العملاء والمبيعات على وسائل التواصل الاجتماعي.</p>
+            </Reveal>
+            <Reveal delay={200} className="value-card">
+              <div className="value-ico">⚡</div>
+              <h3>قيمنا</h3>
+              <p>السرعة في الدعم، الوضوح في التعامل، خصوصية البيانات، وتطوير مستمر يخدم تجربتك.</p>
+            </Reveal>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ */}
       <section className="faq">
         <div className="lp-container">
           <Reveal><div className="section-eyebrow">أسئلة شائعة</div></Reveal>
@@ -399,6 +456,7 @@ function AboutTab() {
         </div>
       </section>
 
+      {/* Final CTA */}
       <section className="contact-cta">
         <div className="lp-container">
           <Reveal>
@@ -409,11 +467,9 @@ function AboutTab() {
                 <button className="lp-btn lp-btn-primary lp-btn-lg" onClick={loginGoogle}>
                   ابدأ الآن مجاناً ←
                 </button>
-              </div>
-              <div className="cta-socials">
-                <a href={WHATSAPP_LINK} target="_blank" rel="noreferrer" className="social wa">واتساب · +962 7 7074 8793</a>
-                <a href={FACEBOOK_LINK} target="_blank" rel="noreferrer" className="social fb">فيسبوك</a>
-                <a href={INSTAGRAM_LINK} target="_blank" rel="noreferrer" className="social ig">إنستغرام</a>
+                <a href={WHATSAPP_LINK} target="_blank" rel="noreferrer" className="lp-btn lp-btn-ghost lp-btn-lg">
+                  تواصل واتساب
+                </a>
               </div>
             </div>
           </Reveal>
