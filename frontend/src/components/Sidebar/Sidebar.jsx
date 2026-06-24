@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, MessageSquare, Bot, ReplyAll, MessageCircle, FileSpreadsheet, Receipt, LineChart, Bell, Settings, Database, History, Megaphone, CheckCircle, Sparkles } from 'lucide-react'
+import { LayoutDashboard, MessageSquare, Bot, ReplyAll, MessageCircle, FileSpreadsheet, Receipt, LineChart, Bell, Settings, Database, History, Megaphone, CheckCircle, Sparkles, AlertOctagon } from 'lucide-react'
 import './Sidebar.css'
 import logoImg from '../../assets/logo.jpg'
 
@@ -24,10 +24,10 @@ const NAV_MAIN = [
 const NAV_TOOLS = [
   { to: '/sales-agent', icon: agentIcon, label: 'الرد الذكي على الزبائن', isImage: true },
   { to: '/comments', icon: commentsIcon, label: 'أتمتة التعليقات', isImage: true },
-  { to: '/post-generator', icon: Sparkles, label: 'مولّد البوستات', isImage: false, badge: 'جديد' },
+  { to: '/complaints', icon: AlertOctagon, label: 'الشكاوى', isImage: false, badgeKey: 'complaints' },
   { to: '/orders', icon: ordersIcon, label: 'الفواتير', isImage: true },
   { to: '/reports', icon: reportsIcon, label: 'التقارير', isImage: true },
-  { to: '/notifications', icon: bellIcon, label: 'الإشعارات', isImage: true },
+  { to: '/notifications', icon: bellIcon, label: 'الإشعارات', isImage: true, badgeKey: 'unread' },
   { to: '/settings', icon: settingsIcon, label: 'الإعدادات', isImage: true },
   { to: '/contact', icon: MessageCircle, label: 'تواصل معنا', isImage: false },
   { to: '/plans', icon: Sparkles, label: 'الخطط والأسعار', isImage: false },
@@ -42,6 +42,7 @@ function planLabel(status, plan, expires) {
 
 export default function Sidebar({ isAdmin, profile = null }) {
   const [storeInfo, setStoreInfo] = useState({ store_name: 'AutoFlow', store_logo: '' })
+  const [counts, setCounts] = useState({ unread: 0, complaints: 0 })
 
   useEffect(() => {
     async function loadStoreInfo() {
@@ -53,6 +54,24 @@ export default function Sidebar({ isAdmin, profile = null }) {
       }
     }
     loadStoreInfo()
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    async function loadCounts() {
+      try {
+        const [unread, complaintsList] = await Promise.all([
+          window.api?.notifications?.unreadCount?.().catch(() => ({ count: 0 })) || { count: 0 },
+          window.api?.notifications?.list?.({ type: 'complaint', limit: 50 }).catch(() => []) || [],
+        ])
+        if (cancelled) return
+        const openComplaints = (complaintsList || []).filter(c => !c.is_read).length
+        setCounts({ unread: unread?.count || 0, complaints: openComplaints })
+      } catch {}
+    }
+    loadCounts()
+    const iv = setInterval(loadCounts, 30000)
+    return () => { cancelled = true; clearInterval(iv) }
   }, [])
 
   return (
@@ -84,17 +103,21 @@ export default function Sidebar({ isAdmin, profile = null }) {
         <div className="nav-group">
           <div className="nav-group-title">الأدوات</div>
           <nav className="sidebar-nav">
-            {NAV_TOOLS.map(item => (
-              <NavLink key={item.to} to={item.to} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-                {item.isImage ? (
-                  <img src={item.icon} alt={item.label} className="nav-img-icon" />
-                ) : (
-                  <item.icon size={18} className="nav-icon" />
-                )}
-                <span className="nav-label">{item.label}</span>
-                {item.badge && <span className="nav-badge">{item.badge}</span>}
-              </NavLink>
-            ))}
+            {NAV_TOOLS.map(item => {
+              const liveCount = item.badgeKey ? counts[item.badgeKey] : 0
+              return (
+                <NavLink key={item.to} to={item.to} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+                  {item.isImage ? (
+                    <img src={item.icon} alt={item.label} className="nav-img-icon" />
+                  ) : (
+                    <item.icon size={18} className="nav-icon" />
+                  )}
+                  <span className="nav-label">{item.label}</span>
+                  {item.badge && <span className="nav-badge">{item.badge}</span>}
+                  {!!liveCount && <span className="nav-badge" style={{background:'#ef4444', color:'#fff'}}>{liveCount}</span>}
+                </NavLink>
+              )
+            })}
           </nav>
         </div>
 

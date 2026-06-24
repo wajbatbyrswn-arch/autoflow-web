@@ -14,6 +14,7 @@ import { compressImage } from '../../lib/imageCompress'
 import { refreshCurrency } from '../../lib/useCurrency'
 import { useSubscription } from '../../lib/subscription'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { rpc } from '../../lib/apiClient'
 import Activate from '../../auth/Activate'
 import './Settings.css'
 
@@ -369,6 +370,8 @@ export default function Settings() {
     await window.api?.settings.set('notif_method', notifMethod)
     await window.api?.settings.set('notif_telegram_token', notifTgToken)
     await window.api?.settings.set('admin_telegram_chat_id', adminChatId)
+    // Also save on user_profiles so the backend notifications pusher can read it.
+    try { await rpc('settings:setTelegramAdminChat', { chat_id: adminChatId }) } catch {}
     await window.api?.settings.set('notif_email_user', notifEmailUser)
     await window.api?.settings.set('notif_email_pass', notifEmailPass)
     await window.api?.settings.set('notif_email_to', notifEmailTo)

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Facebook, Instagram, Phone, Bot, MessageSquare, ShoppingCart, MessageCircle, DollarSign, CheckCircle, AlertTriangle, Info, PlusCircle, LayoutList, Megaphone, FileText, RefreshCw, BarChart2, PieChart as PieChartIcon, Clock, Settings } from 'lucide-react'
+import { Facebook, Instagram, Phone, Bot, MessageSquare, ShoppingCart, MessageCircle, DollarSign, CheckCircle, AlertTriangle, Info, PlusCircle, LayoutList, Megaphone, FileText, RefreshCw, BarChart2, PieChart as PieChartIcon, Clock, Settings, Bell, AlertOctagon } from 'lucide-react'
+import { useSubscription } from '../../lib/subscription'
 import { BarChart, Bar, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import './Dashboard.css'
 
@@ -18,32 +19,33 @@ import ordersIcon from '../../assets/icons/orders.png'
 
 export default function Dashboard() {
   const navigate = useNavigate()
+  const { profile } = useSubscription()
   const [stats, setStats] = useState({ messages_today: 0, orders_today: 0, comments_today: 0, revenue_today: 0 })
+  // Platform status derived from real linked data (Nashir accounts + telegram bot token).
   const [waStatus, setWaStatus] = useState('disconnected')
   const [fbStatus, setFbStatus] = useState('disconnected')
   const [igStatus, setIgStatus] = useState('disconnected')
   const [tgStatus, setTgStatus] = useState('disconnected')
-  const [activities, setActivities] = useState([])
+  const [notifications, setNotifications] = useState([])
 
   useEffect(() => {
     async function loadData() {
       try {
-        const s = await window.api?.db.getStats()
+        const [s, notifs, nashir] = await Promise.all([
+          window.api?.db.getStats().catch(() => null),
+          window.api?.notifications?.list?.({ limit: 6 }).catch(() => []) || [],
+          window.api?.nashir?.status().catch(() => ({})),
+        ])
         if (s) setStats(s)
+        setNotifications(notifs || [])
 
-        const log = await window.api?.db.getActivityLog()
-        if (log) setActivities(log.slice(0, 5))
-
-        const wa = await window.api?.whatsapp.getStatus()
-        setWaStatus(wa?.status || 'disconnected')
-
-        const fb = await window.api?.facebook.getStatus()
-        setFbStatus(fb?.status || 'disconnected')
-
-        const ig = await window.api?.instagram.getStatus()
-        setIgStatus(ig?.status || 'disconnected')
-        const tg = await window.api?.telegram?.getStatus?.()
-        setTgStatus(tg?.status || 'disconnected')
+        // Real status from Nashir: a platform is connected if it has at least one linked account.
+        const platforms = nashir?.platforms || {}
+        setFbStatus((platforms.facebook  || []).length > 0 ? 'connected' : 'disconnected')
+        setIgStatus((platforms.instagram || []).length > 0 ? 'connected' : 'disconnected')
+        setWaStatus((platforms.whatsapp  || []).length > 0 ? 'connected' : 'disconnected')
+        // Telegram = the user has a bot token saved (either via Settings or set by admin).
+        setTgStatus(profile?.telegram_bot_token ? 'connected' : 'disconnected')
       } catch (err) {
         console.error('Error loading dashboard data:', err)
       }
@@ -51,7 +53,7 @@ export default function Dashboard() {
     loadData()
     const iv = setInterval(loadData, 30000)
     return () => clearInterval(iv)
-  }, [])
+  }, [profile?.telegram_bot_token])
 
   const barData1 = (stats.orders_by_day || []).slice(-7).map(d => ({ v: d.count }))
   const barData2 = (stats.orders_by_day || []).slice(-30).map(d => ({ v: d.count }))
@@ -177,49 +179,95 @@ export default function Dashboard() {
 
       {/* Row 3: Content Grid */}
       <div className="dash-row grid-content">
-        {/* Recent Activities */}
+        {/* Recent Notifications (replaces Activities) */}
         <div className="card content-card col-activities">
           <div className="c-header">
-            <span className="c-title">آخر الأنشطة</span>
-            <button className="c-btn" onClick={() => navigate('/logs')}>عرض الكل</button>
+            <span className="c-title"><Bell size={14} style={{verticalAlign:'middle',marginLeft:6}}/> آخر الإشعارات</span>
+            <button className="c-btn" onClick={() => navigate('/notifications')}>عرض الكل</button>
           </div>
           <div className="activity-list">
-            {activities.length > 0 ? activities.map((a, i) => (
-              <div key={i} className="a-item">
-                <div className={`a-icon ${a.platform}`}><Phone size={14} /></div>
-                <div className="a-info">
-                  <span className="a-text">{a.sender_name}</span>
-                  <span className="a-sub">{a.content?.slice(0, 40)}...</span>
+            {notifications.length > 0 ? notifications.map((n) => {
+              const color = n.type === 'order' ? '#10b981' : n.type === 'complaint' ? '#ef4444' : '#3b82f6'
+              const Icon = n.type === 'order' ? ShoppingCart : n.type === 'complaint' ? AlertOctagon : Info
+              return (
+                <div key={n.id} className="a-item" style={{cursor: n.conversation_id ? 'pointer' : 'default'}}
+                  onClick={() => n.conversation_id ? navigate(`/conversations?open=${n.conversation_id}`) : navigate('/notifications')}>
+                  <div className="a-icon" style={{background: color+'22', color}}><Icon size={14}/></div>
+                  <div className="a-info">
+                    <span className="a-text">{n.title}</span>
+                    <span className="a-sub">{(n.body || '').slice(0, 60)}{(n.body||'').length > 60 ? '...' : ''}</span>
+                  </div>
+                  <div className="a-meta">
+                    <span className="a-time">{new Date(n.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</span>
+                    {!n.is_read && <span style={{width:8, height:8, borderRadius:'50%', background:'#ef4444'}}/>}
+                  </div>
                 </div>
-                <div className="a-meta">
-                  <span className="a-time">{a.created_at ? new Date(a.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : '--:--'}</span>
-                  <span className={`a-status ${a.dm_sent ? 'success' : 'info'}`}>{a.event_type}</span>
-                </div>
-              </div>
-            )) : <div className="empty-state">لا توجد أنشطة حالياً</div>}
+              )
+            }) : <div className="empty-state">لا توجد إشعارات حالياً</div>}
           </div>
         </div>
 
-        {/* System Alerts */}
+        {/* System Alerts — real platform status */}
         <div className="card content-card col-alerts">
           <div className="c-header">
             <span className="c-title">تنبيهات النظام</span>
             <button className="c-icon-btn" onClick={() => navigate('/settings')}><Settings size={16} /></button>
           </div>
           <div className="alert-list">
-            <div className="alert-item">
-              <div className="al-icon success"><CheckCircle size={16} /></div>
-              <div className="al-info">
-                <span className="al-text">النظام يعمل</span>
-                <span className="al-sub">كل الأنظمة تعمل بشكل طبيعي</span>
-              </div>
-            </div>
-            {waStatus !== 'connected' && (
+            {fbStatus === 'connected' && igStatus === 'connected' && waStatus === 'connected' && tgStatus === 'connected' ? (
               <div className="alert-item">
-                <div className="al-icon warning"><AlertTriangle size={16} /></div>
+                <div className="al-icon success"><CheckCircle size={16}/></div>
                 <div className="al-info">
-                  <span className="al-text">واتساب منقطع</span>
-                  <span className="al-sub">يرجى فحص اتصال الهاتف</span>
+                  <span className="al-text">كل المنصات متصلة</span>
+                  <span className="al-sub">النظام يعمل بكامل طاقته</span>
+                </div>
+              </div>
+            ) : (
+              <>
+                {fbStatus !== 'connected' && (
+                  <div className="alert-item">
+                    <div className="al-icon warning"><AlertTriangle size={16}/></div>
+                    <div className="al-info">
+                      <span className="al-text">فيسبوك غير مربوط</span>
+                      <span className="al-sub">تواصل معنا لربط الصفحة</span>
+                    </div>
+                  </div>
+                )}
+                {igStatus !== 'connected' && (
+                  <div className="alert-item">
+                    <div className="al-icon warning"><AlertTriangle size={16}/></div>
+                    <div className="al-info">
+                      <span className="al-text">إنستغرام غير مربوط</span>
+                      <span className="al-sub">تواصل معنا لربط الحساب</span>
+                    </div>
+                  </div>
+                )}
+                {waStatus !== 'connected' && (
+                  <div className="alert-item">
+                    <div className="al-icon warning"><AlertTriangle size={16}/></div>
+                    <div className="al-info">
+                      <span className="al-text">واتساب غير مربوط</span>
+                      <span className="al-sub">تواصل معنا لربط الحساب</span>
+                    </div>
+                  </div>
+                )}
+                {tgStatus !== 'connected' && (
+                  <div className="alert-item">
+                    <div className="al-icon info"><Info size={16}/></div>
+                    <div className="al-info">
+                      <span className="al-text">تلغرام غير مربوط</span>
+                      <span className="al-sub">اربط بوت تلغرام من الإعدادات</span>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+            {profile?.subscription_status === 'expired' && (
+              <div className="alert-item">
+                <div className="al-icon warning"><AlertTriangle size={16}/></div>
+                <div className="al-info">
+                  <span className="al-text">اشتراكك منتهي</span>
+                  <span className="al-sub">جدد للاستمرار في استخدام كل المميزات</span>
                 </div>
               </div>
             )}
@@ -232,12 +280,12 @@ export default function Dashboard() {
             <span className="c-title">إجراءات سريعة</span>
           </div>
           <div className="action-grid">
-            <button className="q-action-btn" onClick={() => navigate('/conversations')}><MessageSquare size={24} className="c-blue" /><span>محادثة جديدة</span></button>
-            <button className="q-action-btn" onClick={() => navigate('/products')}><PlusCircle size={24} className="c-green" /><span>إضافة منتج</span></button>
+            <button className="q-action-btn" onClick={() => navigate('/conversations')}><MessageSquare size={24} className="c-blue" /><span>المحادثات</span></button>
+            <button className="q-action-btn" onClick={() => navigate('/sales-agent')}><PlusCircle size={24} className="c-green" /><span>إضافة منتج</span></button>
             <button className="q-action-btn" onClick={() => navigate('/orders')}><LayoutList size={24} className="c-orange" /><span>عرض الطلبات</span></button>
-            <button className="q-action-btn" onClick={() => navigate('/campaigns')}><Megaphone size={24} className="c-red" /><span>إنشاء حملة</span></button>
+            <button className="q-action-btn" onClick={() => navigate('/complaints')}><AlertOctagon size={24} className="c-red" /><span>الشكاوى</span></button>
             <button className="q-action-btn" onClick={() => navigate('/reports')}><BarChart2 size={24} className="c-purple" /><span>التقارير</span></button>
-            <button className="q-action-btn" onClick={() => navigate('/ai-config')}><RefreshCw size={24} className="c-teal" /><span>تحديث الـ AI</span></button>
+            <button className="q-action-btn" onClick={() => navigate('/notifications')}><Bell size={24} className="c-teal" /><span>الإشعارات</span></button>
           </div>
         </div>
       </div>

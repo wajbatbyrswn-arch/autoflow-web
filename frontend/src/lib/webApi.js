@@ -85,6 +85,21 @@ export function installWebApi() {
       reply: (conversation_id, message) => rpc('inbox:reply', { conversation_id, message }),
     },
 
+    // Notifications + complaints (orders, complaints, system) — pushed to Telegram if configured.
+    notifications: {
+      list: (opts) => rpc('notifications:list', opts),
+      unreadCount: () => rpc('notifications:unreadCount'),
+      markRead: (id) => rpc('notifications:markRead', { id }),
+      markAllRead: () => rpc('notifications:markAllRead'),
+      delete: (id) => rpc('notifications:delete', { id }),
+    },
+
+    // Per-conversation AI pause controls (manual takeover, complaint, scheduled pause).
+    conversations: {
+      pauseAI: (convId, hours) => rpc('conversations:pauseAI', { convId, hours }),
+      resumeAI: (convId) => rpc('conversations:resumeAI', { convId }),
+    },
+
     telegram: {
       connect: (config) => rpc('telegram:connect', config),
       disconnect: () => rpc('telegram:disconnect'),

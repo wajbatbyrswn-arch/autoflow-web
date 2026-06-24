@@ -13,6 +13,7 @@ import { aiHandlers } from './handlers/ai';
 import { settingsHandlers } from './handlers/settings';
 import { accountHandlers } from './handlers/account';
 import { nashirHandlers } from './handlers/nashir';
+import { notificationsHandlers } from './handlers/notifications';
 import { stubHandlers } from './handlers/stubs';
 
 const app = express();
@@ -28,6 +29,7 @@ registerAll({
   ...settingsHandlers,
   ...accountHandlers,
   ...nashirHandlers,
+  ...notificationsHandlers,
   ...stubHandlers,
 });
 

@@ -11,10 +11,11 @@ import Conversations from './pages/Conversations/Conversations'
 import Orders from './pages/Orders/Orders'
 import Reports from './pages/Reports/Reports'
 import Settings from './pages/Settings/Settings'
-import PostGeneratorRoot from './pages/PostGenerator/PostGeneratorRoot'
 import Admin from './pages/Admin/Admin'
 import Contact from './pages/Contact/Contact'
 import Plans from './pages/Plans/Plans'
+import Notifications from './pages/Notifications/Notifications'
+import Complaints from './pages/Complaints/Complaints'
 import { SubscriptionProvider } from './lib/subscription'
 import './styles/globals.css'
 
@@ -65,7 +66,8 @@ export default function App({ profile, onSubscriptionChange }) {
                 <Route path="/orders" element={<Orders />} />
                 <Route path="/reports" element={<Reports />} />
                 <Route path="/settings" element={<Settings />} />
-                <Route path="/post-generator/*" element={<PostGeneratorRoot />} />
+                <Route path="/notifications" element={<Notifications />} />
+                <Route path="/complaints" element={<Complaints />} />
                 <Route path="/contact" element={<Contact />} />
                 <Route path="/plans" element={<Plans />} />
                 {isAdmin && <Route path="/admin" element={<Admin />} />}

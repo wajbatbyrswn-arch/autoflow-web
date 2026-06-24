@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import './Conversations.css'
 
@@ -47,8 +48,18 @@ export default function Conversations() {
   const bottomRef = useRef(null)
   const inputRef = useRef(null)
 
+  const [searchParams] = useSearchParams()
+
   // Load conversations when platform filter changes
   useEffect(() => { loadConvs() }, [platformFilter])
+
+  // Open conversation from notification deep link (?open=convId)
+  useEffect(() => {
+    const openId = searchParams.get('open')
+    if (!openId || !convs.length) return
+    const match = convs.find(c => String(c.id) === String(openId))
+    if (match) setSelected(match)
+  }, [convs, searchParams])
 
   // Load messages when selected conversation changes
   useEffect(() => {
@@ -236,6 +247,35 @@ export default function Conversations() {
                 </div>
               </div>
               <div className="flex gap-2 items-center">
+                {selected.ai_paused_until && new Date(selected.ai_paused_until) > new Date() && (
+                  <span style={{fontSize:11, color:'#fff', background:'#f59e0b', padding:'4px 10px', borderRadius:20, fontWeight:700}}>
+                    🤖 AI متوقف · يعود {new Date(selected.ai_paused_until).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'})}
+                  </span>
+                )}
+                <div style={{position:'relative'}}>
+                  <select
+                    onChange={async e => {
+                      const v = e.target.value
+                      if (!v) return
+                      try {
+                        if (v === 'resume') {
+                          await window.api?.conversations?.resumeAI?.(selected.id)
+                          setSelected(s => ({...s, ai_paused_until: null}))
+                        } else {
+                          const res = await window.api?.conversations?.pauseAI?.(selected.id, Number(v))
+                          setSelected(s => ({...s, ai_paused_until: res?.paused_until}))
+                        }
+                      } catch {}
+                      e.target.value = ''
+                    }}
+                    defaultValue=""
+                    style={{padding:'6px 14px', borderRadius:10, background:'var(--bg-input,#1a1d24)', color:'inherit', border:'1px solid var(--border-color,#2a2e37)', fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit'}}>
+                    <option value="" disabled>🤖 تحكم بالـ AI</option>
+                    <option value="1">إيقاف الرد ساعة</option>
+                    <option value="24">إيقاف الرد 24 ساعة</option>
+                    <option value="resume">استئناف الرد الذكي</option>
+                  </select>
+                </div>
                 <span style={{fontSize:11, color:'var(--text-muted)', background:'var(--glass-bg)', padding:'4px 10px', borderRadius:20, border:'1px solid var(--border-color)'}}>
                   ID: {selected.sender_id}
                 </span>

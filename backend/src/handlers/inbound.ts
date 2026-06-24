@@ -2,6 +2,26 @@ import { supabase } from '../supabase';
 import { nashir, nashirKey } from './nashir';
 import { resolveConfig, sendToAI } from './ai';
 import { emit } from '../events';
+import { createNotification } from './notifications';
+
+// Arabic + English keywords that strongly suggest a customer complaint.
+const COMPLAINT_PATTERNS = [
+  'شكوى','شكوي','اشتكي','أشكي','أشتكي','مشكلة','مشكله','مشاكل','زعلان','منزعج',
+  'سيء','سيئة','سيئه','تعبت','استغل','نصب','احتيال','غش','مزور','تعب',
+  'بدي اشكي','مدير','الإدارة','الاداره','بدي ارجاع','استرجاع','استرداد',
+  'تأخير','تاخير','تاخرتو','ما وصل','مش وصل','لم يصل','wrong','complaint','refund','angry','disappointed',
+  'مغشوش','تالف','مكسور','عاطل','ما يشتغل','مش شغال','لا يعمل','معطل',
+];
+
+function looksLikeComplaint(text: string): boolean {
+  if (!text) return false;
+  const lower = text.toLowerCase();
+  return COMPLAINT_PATTERNS.some(k => lower.includes(k.toLowerCase()));
+}
+
+const COMPLAINT_REPLY = 'تم إيصال مشكلتك للإدارة، سيتم التواصل معك في أقرب وقت ممكن. شكراً لصبرك. 🙏';
+
+const PAUSE_HOURS_COMPLAINT = 2;
 
 async function buildSystemPrompt(userId: string): Promise<string> {
   const { data: store } = await supabase.from('store_config').select('store_name, system_prompt').eq('user_id', userId).single();
@@ -85,12 +105,34 @@ async function maybeExtractAndSaveOrder(
       status: 'new',
     });
     console.log(`[inbound] order saved: ${orderNum} for conv ${convId}`);
+
+    // Push a notification (DB + Telegram bot if configured).
+    const productLines = products.map((p: any) => `• ${p.name} × ${p.quantity}`).join('\n');
+    createNotification(
+      userId, 'order',
+      `طلب جديد #${orderNum}`,
+      `العميل: ${orderData.customer_name || senderName}\nالهاتف: ${orderData.customer_phone || '—'}\nالمدينة: ${orderData.customer_city || ''} ${orderData.customer_area || ''}\nالإجمالي: ${total}\n${productLines}`,
+      convId,
+      { order_number: orderNum, total },
+    ).catch(() => {});
   } catch (e: any) {
     console.error('[inbound order parse]', e?.message || e);
   }
 
   // Strip the tag block from the reply sent to the customer
   return reply.replace(/\[ORDER_READY\][\s\S]*?\[\/ORDER_READY\]/g, '').trim();
+}
+
+/** Mark conversation as AI-paused for N hours. */
+async function pauseConversationAI(convId: number, hours: number) {
+  const until = new Date(Date.now() + hours * 3600 * 1000).toISOString();
+  await supabase.from('conversations').update({ ai_paused_until: until }).eq('id', convId);
+}
+
+/** Is AI currently paused for this conversation? */
+function isAIPaused(conv: any): boolean {
+  if (!conv?.ai_paused_until) return false;
+  return new Date(conv.ai_paused_until) > new Date();
 }
 
 /**
@@ -165,6 +207,58 @@ export async function processInbound(userId: string, raw: any): Promise<string> 
     conv = created.data;
   } else {
     await supabase.from('conversations').update({ last_message: item.content, last_message_at: new Date().toISOString() }).eq('id', conv.id);
+  }
+
+  // ---- Complaint detection (runs BEFORE AI to short-circuit) ----
+  if (looksLikeComplaint(item.content) && !isAIPaused(conv)) {
+    // Insert the customer's message
+    if (!exists) {
+      await supabase.from('messages').insert({
+        user_id: userId, conversation_id: conv!.id, nashir_message_id: item.dedupKey,
+        nashir_reply_id: item.replyId ? String(item.replyId) : null,
+        sender: 'customer', content: item.content, message_type: item.isComment ? 'comment' : 'dm', ai_suggestion: COMPLAINT_REPLY,
+      });
+    }
+    // Pause AI for 2h on this conv
+    await pauseConversationAI(conv!.id, PAUSE_HOURS_COMPLAINT);
+    // Create complaint notification (DB + telegram)
+    createNotification(
+      userId, 'complaint',
+      `شكوى من ${item.senderName}`,
+      `العميل: ${item.senderName}\nالمنصة: ${item.platform}\nالرسالة:\n"${item.content.slice(0, 300)}"\n\nتم إيقاف الرد الذكي لمدة ${PAUSE_HOURS_COMPLAINT} ساعة على هذه المحادثة.`,
+      conv!.id,
+      { sender_id: item.senderId, message: item.content },
+    ).catch(() => {});
+
+    // Send the canned reply via Nashir if auto-reply is on and we have a replyId
+    if (item.replyId && await autoReplyEnabled(userId)) {
+      const key = await nashirKey(userId);
+      if (key) {
+        try {
+          if (item.isComment) await nashir.replyComment(key, item.replyId, COMPLAINT_REPLY);
+          else await nashir.replyMessage(key, item.replyId, COMPLAINT_REPLY);
+          await supabase.from('messages').insert({
+            user_id: userId, conversation_id: conv!.id, sender: 'assistant', content: COMPLAINT_REPLY, message_type: 'text',
+          });
+        } catch (e: any) { console.error('[inbound complaint reply]', e?.message || e); }
+      }
+    }
+    emit(userId, `${item.base}:message`, { convId: conv!.id, platform: item.platform });
+    emit(userId, 'notification', { type: 'complaint' });
+    return COMPLAINT_REPLY;
+  }
+
+  // ---- AI pause check: skip AI if conversation is paused (manual takeover or complaint) ----
+  if (isAIPaused(conv)) {
+    if (!exists) {
+      await supabase.from('messages').insert({
+        user_id: userId, conversation_id: conv!.id, nashir_message_id: item.dedupKey,
+        nashir_reply_id: item.replyId ? String(item.replyId) : null,
+        sender: 'customer', content: item.content, message_type: item.isComment ? 'comment' : 'dm',
+      });
+    }
+    emit(userId, `${item.base}:message`, { convId: conv!.id, platform: item.platform });
+    return '';
   }
 
   let reply = '';

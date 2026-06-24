@@ -153,7 +153,14 @@ export const nashirHandlers = {
     await supabase.from('messages').insert({
       user_id: userId, conversation_id, sender: 'agent', content: message, message_type: 'text',
     });
-    await supabase.from('conversations').update({ last_message: message, last_message_at: new Date().toISOString() }).eq('id', conversation_id);
-    return { success: true };
+    // Manual takeover → pause AI on this conversation for 2 hours so it doesn't
+    // talk over the human agent who just stepped in.
+    const pausedUntil = new Date(Date.now() + 2 * 3600 * 1000).toISOString();
+    await supabase.from('conversations').update({
+      last_message: message,
+      last_message_at: new Date().toISOString(),
+      ai_paused_until: pausedUntil,
+    }).eq('id', conversation_id);
+    return { success: true, ai_paused_until: pausedUntil };
   },
 };
