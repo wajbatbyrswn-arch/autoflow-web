@@ -37,6 +37,13 @@ function Reveal({ children, delay = 0, as = 'div', className = '', style = {} })
   )
 }
 
+const PROBLEMS = [
+  { i: '😩', t: 'رسائل تضيع', d: 'زبون كتبلك الساعة 3 صباحاً وما رديت — راح اشترى من غيرك.' },
+  { i: '🔁', t: 'نفس الأسئلة ١٠٠ مرة', d: '"كم السعر؟" "هل متوفر؟" "كم التوصيل؟" — ساعات يومياً تضيع.' },
+  { i: '🤯', t: 'تنقّل بين المنصات', d: 'فيسبوك، إنستا، واتساب، تلغرام — مستحيل تتابعهم كلهم بنفس الوقت.' },
+  { i: '📉', t: 'طلبات بلا متابعة', d: 'الزبون قال "تمام بدي اطلب" والمحادثة ضاعت بين 50 رسالة.' },
+]
+
 const FEATURES = [
   { i: '🤖', t: 'موظف مبيعات ذكي', d: 'يرد على زبائنك تلقائياً 24/7 بنفس لغتهم، يعرف منتجاتك، أسعارك، ويُتمّ الطلب لحدّ ما يحطّك العنوان والرقم.' },
   { i: '💬', t: 'صندوق وارد موحّد', d: 'كل رسائل فيسبوك، إنستغرام، واتساب، وتلغرام في مكان واحد. ما عاد عندك تنقل بين الحسابات.' },
@@ -44,6 +51,30 @@ const FEATURES = [
   { i: '📊', t: 'تحليلات وتقارير ذكية', d: 'إيرادات، متوسط الطلب، أوقات الذروة، توزيع المنصات — كل شي قدامك بـ realtime.' },
   { i: '✨', t: 'مولّد بوستات AI', d: 'اطلب من الـ AI ينشأ لك بوستات احترافية بصور ومحتوى مناسب لمتجرك.' },
   { i: '🔒', t: 'فصل كامل لكل متجر', d: 'بيانات متجرك معزولة تماماً. لا أحد يقدر يشوف محادثاتك أو زبائنك.' },
+]
+
+const USE_CASES = [
+  { e: '👗', t: 'متاجر الأزياء', d: 'يجاوب على المقاسات، الألوان، الصور، ويسجّل طلب التوصيل تلقائياً.' },
+  { e: '💄', t: 'متاجر العطور ومستحضرات التجميل', d: 'يعرّف الزبون على المنتجات، يقترح بدائل، ويُتمّ البيع.' },
+  { e: '📱', t: 'متاجر الإلكترونيات', d: 'يقارن المواصفات، يجاوب أسئلة تقنية، ويحجز الجهاز.' },
+  { e: '🍰', t: 'محلات الحلويات والمأكولات', d: 'يستقبل الطلبات حسب القائمة، يحسب الإجمالي، ويأخذ بيانات التوصيل.' },
+  { e: '💍', t: 'محلات الإكسسوارات', d: 'يعرض الموديلات، الأسعار، ويتعامل مع طلبات الجملة والمفرد.' },
+  { e: '🏪', t: 'أي متجر بـ instagram أو fb', d: 'لو عندك صفحة وتستقبل طلبات DM — AutoFlow يناسبك مية بالمية.' },
+]
+
+const TESTIMONIALS = [
+  { n: 'أحمد العبد الله', r: 'صاحب متجر عطور — عمّان', t: 'الـ AI ردّ على ٤٧ رسالة ليلة وحدة وأنا نايم. صحيت لقيت ١٢ طلب جديد. حرفياً غيّر حياتي.', a: 'أ' },
+  { n: 'سارة الحوراني', r: 'متجر ملابس نسائية — إربد', t: 'كنت أصرف ٥ ساعات يومياً أرد على رسائل. هلأ صار AutoFlow يردّ عني وأنا بركّز على التصميمات.', a: 'س' },
+  { n: 'محمد القاضي', r: 'متجر إكسسوارات — الزرقاء', t: 'بصراحة ما توقعت ذكي بهالشكل. يفهم اللهجة الأردنية ويتعامل مع الزبون كأنه إنسان فعلاً.', a: 'م' },
+]
+
+const COMPARE = [
+  { f: 'الرد على الرسائل', before: 'يدوي · ساعات ضائعة', after: 'تلقائي · فوري 24/7' },
+  { f: 'فقدان طلبات', before: 'كثير (رسائل ضائعة)', after: 'لا · كل رسالة تُلتقط' },
+  { f: 'المنصات', before: '4 تطبيقات منفصلة', after: 'صندوق وارد واحد' },
+  { f: 'تسجيل الطلبات', before: 'ورقة وقلم أو Excel', after: 'تلقائي عند التأكيد' },
+  { f: 'وقت العمل', before: '12 ساعة على الأقل', after: '٢٤ ساعة بدون توقف' },
+  { f: 'تحليل الأداء', before: 'لا يوجد', after: 'تقارير حية ذكية' },
 ]
 
 const STEPS = [
@@ -183,6 +214,21 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* Platforms strip */}
+      <section className="platforms-strip">
+        <div className="lp-container">
+          <Reveal><div className="platforms-label">يعمل مع كل المنصات اللي تستخدمها</div></Reveal>
+          <Reveal delay={100}>
+            <div className="platforms-row">
+              <div className="plat-pill"><span className="plat-ico fb">f</span> فيسبوك</div>
+              <div className="plat-pill"><span className="plat-ico ig">📷</span> إنستغرام</div>
+              <div className="plat-pill"><span className="plat-ico wa">💬</span> واتساب</div>
+              <div className="plat-pill"><span className="plat-ico tg">✈</span> تلغرام</div>
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
       {/* Stats */}
       <section className="stats-strip">
         <div className="lp-container stats-grid">
@@ -190,6 +236,24 @@ export default function Landing() {
           <Reveal delay={80}><div className="stat"><div className="stat-n">٢٤/٧</div><div className="stat-l">رد فوري</div></div></Reveal>
           <Reveal delay={160}><div className="stat"><div className="stat-n">١٠د</div><div className="stat-l">للربط الكامل</div></div></Reveal>
           <Reveal delay={240}><div className="stat"><div className="stat-n">+٩٠٪</div><div className="stat-l">رضا الزبائن</div></div></Reveal>
+        </div>
+      </section>
+
+      {/* Problems */}
+      <section className="problems">
+        <div className="lp-container">
+          <Reveal><div className="section-eyebrow pain">المشاكل اللي بتواجهك</div></Reveal>
+          <Reveal delay={60}><h2 className="section-title">هل هذي مشاكل تعرفها؟</h2></Reveal>
+          <Reveal delay={120}><p className="section-sub">كل تاجر يبيع أونلاين يعاني من هذي الأمور كل يوم — AutoFlow يحلّها لك من جذورها.</p></Reveal>
+          <div className="problems-grid">
+            {PROBLEMS.map((p, i) => (
+              <Reveal key={i} delay={i * 60} className="problem-card">
+                <div className="problem-ico">{p.i}</div>
+                <h3>{p.t}</h3>
+                <p>{p.d}</p>
+              </Reveal>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -289,6 +353,72 @@ export default function Landing() {
               <div className="about-stat"><div className="as-n">∞</div><div className="as-l">تحديثات مستمرة</div></div>
             </div>
           </Reveal>
+        </div>
+      </section>
+
+      {/* Use cases */}
+      <section className="use-cases">
+        <div className="lp-container">
+          <Reveal><div className="section-eyebrow">لمن يناسب؟</div></Reveal>
+          <Reveal delay={60}><h2 className="section-title">أي متجر يستفيد من AutoFlow</h2></Reveal>
+          <Reveal delay={120}><p className="section-sub">سواء كنت تبيع عطور، ملابس، إكسسوارات، أو إلكترونيات — الـ AI يتعلم منتجاتك ويبيعها لك.</p></Reveal>
+          <div className="usecases-grid">
+            {USE_CASES.map((u, i) => (
+              <Reveal key={i} delay={i * 60} className="usecase-card">
+                <div className="usecase-emoji">{u.e}</div>
+                <h3>{u.t}</h3>
+                <p>{u.d}</p>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Before/After comparison */}
+      <section className="compare">
+        <div className="lp-container">
+          <Reveal><div className="section-eyebrow">قبل / بعد</div></Reveal>
+          <Reveal delay={60}><h2 className="section-title">شو الفرق مع AutoFlow؟</h2></Reveal>
+
+          <Reveal delay={120}>
+            <div className="compare-table">
+              <div className="ct-head">
+                <div className="ct-cell ct-feature">المهمة</div>
+                <div className="ct-cell ct-bad">بدون AutoFlow</div>
+                <div className="ct-cell ct-good">مع AutoFlow</div>
+              </div>
+              {COMPARE.map((c, i) => (
+                <div key={i} className="ct-row">
+                  <div className="ct-cell ct-feature">{c.f}</div>
+                  <div className="ct-cell ct-bad">✕ {c.before}</div>
+                  <div className="ct-cell ct-good">✓ {c.after}</div>
+                </div>
+              ))}
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* Testimonials */}
+      <section className="testimonials">
+        <div className="lp-container">
+          <Reveal><div className="section-eyebrow">ماذا يقول عملاؤنا</div></Reveal>
+          <Reveal delay={60}><h2 className="section-title">تجارب حقيقية من تجار حقيقيين</h2></Reveal>
+          <div className="testi-grid">
+            {TESTIMONIALS.map((t, i) => (
+              <Reveal key={i} delay={i * 80} className="testi-card">
+                <div className="testi-quote">"</div>
+                <p className="testi-text">{t.t}</p>
+                <div className="testi-foot">
+                  <div className="testi-avatar">{t.a}</div>
+                  <div>
+                    <div className="testi-name">{t.n}</div>
+                    <div className="testi-role">{t.r}</div>
+                  </div>
+                </div>
+              </Reveal>
+            ))}
+          </div>
         </div>
       </section>
 
