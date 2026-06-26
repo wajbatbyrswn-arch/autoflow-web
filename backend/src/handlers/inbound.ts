@@ -65,9 +65,9 @@ const ORDER_CONTRACT = `
 
 🅾️ المرحلة C — التسجيل النهائي:
 إذا ردّ العميل بإيجاب صريح ("نعم"، "تم"، "أكد"، "ok"، "yes"، "أكد الطلب")، عندها فقط:
-1) أصدر الوسم مرة واحدة فقط بهذا الشكل الحرفي في بداية الرد (سيُحذف الوسم تلقائياً من رسالة العميل):
+1) يجب أن يبدأ ردّك بالوسم التالي حرفياً بدون أي نص قبله — هذا الوسم إلزامي والنظام لن يسجّل الطلب بدونه:
 [ORDER_READY]{"customer_name":"...","customer_phone":"...","customer_city":"...","customer_area":"...","products":[{"name":"...","quantity":1,"price":0}],"total_amount":0}[/ORDER_READY]
-2) أتبعه بجملة قصيرة: "تم تسجيل طلبك بنجاح. سنتواصل معك للتأكيد قريباً 🌹"
+2) بعد الوسم مباشرةً (في نفس الرد) أضف: "تم تسجيل طلبك بنجاح. سنتواصل معك للتأكيد قريباً 🌹"
 
 ⚠️ لا تكرّر الوسم ولا تُصدره مرة ثانية في نفس المحادثة بعد التسجيل.
 ⚠️ لا تخترع منتجات أو أسعار غير موجودة في قائمة المنتجات أدناه.
@@ -140,7 +140,8 @@ function stripMarkdown(text: string): string {
 async function maybeExtractAndSaveOrder(
   reply: string, userId: string, convId: number, platform: string, senderName: string
 ): Promise<string> {
-  const match = reply.match(/\[ORDER_READY\]([\s\S]*?)\[\/ORDER_READY\]/);
+  console.log('[inbound raw reply]', reply.slice(0, 600));
+  const match = reply.match(/\[ORDER_READY\]\s*([\s\S]*?)\s*\[\/ORDER_READY\]/);
   if (!match) return reply;
 
   // Defense in depth: even if the AI emits ORDER_READY multiple times in the same
@@ -160,7 +161,8 @@ async function maybeExtractAndSaveOrder(
   } catch (e: any) { console.error('[inbound dedup check]', e?.message || e); }
 
   try {
-    const orderData = JSON.parse(match[1].trim());
+    const rawJson = match[1].trim().replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim();
+    const orderData = JSON.parse(rawJson);
     const products = orderData.products || [];
     const total = orderData.total_amount
       || products.reduce((s: number, p: any) => s + ((Number(p.price) || 0) * (Number(p.quantity) || 1)), 0);
@@ -191,7 +193,7 @@ async function maybeExtractAndSaveOrder(
       { order_number: orderNum, total },
     ).catch(() => {});
   } catch (e: any) {
-    console.error('[inbound order parse]', e?.message || e);
+    console.error('[inbound order parse ERROR]', e?.message || e, '| raw JSON:', match[1].slice(0, 300));
   }
 
   // Strip the tag block from the reply sent to the customer

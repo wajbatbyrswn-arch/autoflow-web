@@ -26,6 +26,9 @@ export const nashir = {
     client(key).post(`/comments/${id}/reply`, { message, ...(pageId ? { pageId } : {}) }).then(r => r.data),
   markRead: (key: string, id: number | string) => client(key).patch(`/messages/${id}/read`).then(r => r.data),
   createPost: (key: string, body: any) => client(key).post('/posts', body).then(r => r.data),
+  // Send a new DM to a user who commented. Nashir may expose this as POST /messages with recipient_id.
+  sendDM: (key: string, { platform, recipient_id, message }: { platform: string; recipient_id: string; message: string }) =>
+    client(key).post('/messages', { platform, recipient_id, message }).then(r => r.data),
 };
 
 async function statusFor(userId: string, platform: 'facebook' | 'instagram') {

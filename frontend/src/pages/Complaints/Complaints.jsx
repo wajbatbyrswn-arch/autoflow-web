@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { AlertOctagon, MessageCircle, CheckCircle2, Play, Trash2 } from 'lucide-react'
+import { useConfirm } from '../../components/ConfirmDialog/ConfirmDialog'
 
 export default function Complaints() {
   const nav = useNavigate()
+  const confirm = useConfirm()
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -29,7 +31,8 @@ export default function Complaints() {
     toast.success('تم استئناف الرد الذكي')
   }
   async function del(c) {
-    if (!confirm('حذف الشكوى من السجل؟')) return
+    const ok = await confirm({ title: 'حذف الشكوى', message: 'هل تريد حذف هذه الشكوى من السجل نهائياً؟', confirmText: 'حذف', dangerous: true, rememberKey: 'complaint_delete' })
+    if (!ok) return
     await window.api?.notifications?.delete?.(c.id)
     setItems(prev => prev.filter(n => n.id !== c.id))
   }

@@ -29,7 +29,9 @@ export async function processInboundComment(userId: string, raw: any) {
   const platform = String(raw.platform || 'facebook').toLowerCase();
   const commentId = String(raw.nashir_message_id || raw.id || raw.comment_id || '');
   if (!commentId) return;
-  const postId = String(raw.post_id || raw.parent_id || '');
+  const postId = String(raw.post_id || raw.parent_id || '').trim();
+  // Some platforms prefix post_id with page_id (e.g. "PAGE_POST") — store short form too for matching.
+  const postIdShort = postId.includes('_') ? postId.split('_').slice(1).join('_') : postId;
   const commenterName = String(raw.sender_name || raw.from || 'متابع');
   const commenterId = String(raw.sender_id || '');
   const content = String(raw.message || raw.text || raw.content || '');
@@ -41,9 +43,10 @@ export async function processInboundComment(userId: string, raw: any) {
 
   const isNegative = quickNegative(content);
 
-  // Match automation (post + trigger keyword)
+  // Match automation — try both the full post_id and the short form (without page prefix).
   const { data: automations } = await supabase.from('comment_automations')
-    .select('*').eq('user_id', userId).eq('post_id', postId).eq('is_active', true);
+    .select('*').eq('user_id', userId).eq('is_active', true)
+    .or(`post_id.eq.${postId},post_id.eq.${postIdShort}`);
   const matched = (automations || []).find((a: any) => {
     const kws = (a.trigger_keywords || []) as string[];
     return kws.some((kw: string) => content.toLowerCase().includes(String(kw).toLowerCase()));
@@ -80,10 +83,10 @@ export async function processInboundComment(userId: string, raw: any) {
       const dmBody = matched.dm_attachment_url
         ? `${matched.dm_message}\n\n${matched.dm_attachment_url}`
         : matched.dm_message;
-      // Nashir REST: send a fresh message rather than reply (replyMessage needs a message id).
-      // Fall back: many integrations require channel-specific send. Best-effort here.
-      await (nashir as any).sendDM?.(key, { platform, recipient_id: commenterId, message: dmBody });
-    } catch {}
+      await nashir.sendDM(key, { platform, recipient_id: commenterId, message: dmBody });
+    } catch (e: any) {
+      console.error('[comment automation DM]', e?.response?.status, e?.response?.data || e?.message);
+    }
     await supabase.from('comments_inbox').update({ ai_replied: true }).eq('comment_id', commentId);
     await supabase.from('comment_automations').update({ triggered_count: (matched.triggered_count || 0) + 1 }).eq('id', matched.id);
     return;
