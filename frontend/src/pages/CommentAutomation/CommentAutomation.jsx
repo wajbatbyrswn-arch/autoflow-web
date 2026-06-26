@@ -82,8 +82,8 @@ export default function CommentAutomation() {
   }
 
   async function saveAutomation() {
-    if (!editing.post_id || !editing.trigger_keywords?.length || !editing.comment_reply || !editing.dm_message) {
-      toast.error('الحقول المطلوبة: المنشور، الكلمات المفتاحية، رد التعليق، رسالة الخاص')
+    if (!editing.trigger_keywords?.length || !editing.comment_reply) {
+      toast.error('الحقول المطلوبة: الكلمات المفتاحية ورد التعليق')
       return
     }
     try {
@@ -118,7 +118,7 @@ export default function CommentAutomation() {
 
   async function runTest() {
     if (!editing?.trigger_keywords?.length) { toast.error('أضف كلمة مفتاحية أولاً'); return }
-    if (!editing?.comment_reply || !editing?.dm_message) { toast.error('املأ رد التعليق ورسالة الخاص أولاً'); return }
+    if (!editing?.comment_reply) { toast.error('املأ رد التعليق أولاً'); return }
     setTesting(true)
     try {
       const res = await window.api?.comments?.testAutomation?.(editing)
@@ -203,10 +203,8 @@ export default function CommentAutomation() {
             <Sparkles size={18} />
             <div>
               <strong>كيف تعمل اتمتة التعليقات؟</strong>
-              <p>عند أي تعليق على المنشور المحدد يحتوي على كلمة من الكلمات المفتاحية، يتم تلقائياً:
-                1) الرد العام على التعليق برسالة "تم الإرسال للخاص"،
-                2) إرسال رسالة خاصة (DM) للزبون بالتفاصيل/الرابط/الملف.
-                <br/>الردود الذكية على التعليقات تتوقف لهذا المنشور.</p>
+              <p>عندما يعلّق أي شخص بكلمة من الكلمات المفتاحية على أي منشور، يتم تلقائياً الرد العلني على تعليقه. الرد الذكي يتوقف تلقائياً لأي تعليق طابق الكلمات المفتاحية.</p>
+              <p style={{marginTop:6, opacity:.7, fontSize:12}}>ملاحظة: رسالة الخاص (DM) محفوظة للمستقبل — Nashir لا يدعم إرسال DM جديد للمعلّقين حالياً. سيُرسَل الخاص لهم عند مراسلتهم لك أولاً.</p>
             </div>
           </div>
 
@@ -267,8 +265,8 @@ export default function CommentAutomation() {
 
           <div className="setting-row">
             <div>
-              <div className="setting-title">حذف التعليقات السيئة تلقائياً</div>
-              <div className="setting-desc">عند رصد كلمات هجومية/مسيئة في التعليق، يتم إخفاؤه/حذفه تلقائياً.</div>
+              <div className="setting-title">إخفاء التعليقات السيئة من الداشبورد</div>
+              <div className="setting-desc">عند رصد كلمات هجومية/مسيئة، يتم إخفاء التعليق من قائمة التعليقات هنا. لحذفه من المنصة (فيسبوك/إنستغرام) يجب الحذف يدوياً.</div>
             </div>
             <label className="switch">
               <input type="checkbox" checked={!!settings.auto_delete_bad_comments}

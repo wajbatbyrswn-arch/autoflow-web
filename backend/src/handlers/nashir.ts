@@ -93,18 +93,22 @@ export const nashirHandlers = {
     }
 
     // SECONDARY FALLBACK: if still nothing showed, derive connected platforms from real
-    // inbound traffic. If we received messages from a platform in the last 30 days, it's
-    // clearly connected — the API check is just for cosmetics.
+    // inbound traffic. Check both DMs (conversations) and comments (comments_inbox).
     if (result.connectedCount === 0) {
       const since = new Date(Date.now() - 30 * 86400000).toISOString();
-      const { data: convs } = await supabase.from('conversations')
-        .select('platform').eq('user_id', userId).gte('last_message_at', since);
-      const seen = new Set((convs || []).map((c: any) => String(c.platform || '').toLowerCase()));
+      const [{ data: convs }, { data: recentComments }] = await Promise.all([
+        supabase.from('conversations').select('platform').eq('user_id', userId).gte('last_message_at', since),
+        supabase.from('comments_inbox').select('platform').eq('user_id', userId).gte('created_at', since),
+      ]);
+      const seen = new Set([
+        ...(convs || []).map((c: any) => String(c.platform || '').toLowerCase()),
+        ...(recentComments || []).map((c: any) => String(c.platform || '').toLowerCase()),
+      ]);
       let derived = 0;
       for (const p of seen) {
         if (!p || !result.platforms[p]) continue;
         if (result.platforms[p].length === 0) {
-          result.platforms[p].push({ pageId: 'derived', pageName: 'مربوط ✓ (مؤكَّد من الرسائل)', platform: p, _derived: true });
+          result.platforms[p].push({ pageId: 'derived', pageName: 'مربوط ✓ (مؤكَّد من النشاط)', platform: p, _derived: true });
           derived++;
         }
       }

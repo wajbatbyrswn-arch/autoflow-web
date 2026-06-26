@@ -30,8 +30,6 @@ export async function processInboundComment(userId: string, raw: any) {
   const commentId = String(raw.nashir_message_id || raw.id || raw.comment_id || '');
   if (!commentId) return;
   const postId = String(raw.post_id || raw.parent_id || '').trim();
-  // Some platforms prefix post_id with page_id (e.g. "PAGE_POST") — store short form too for matching.
-  const postIdShort = postId.includes('_') ? postId.split('_').slice(1).join('_') : postId;
   const commenterName = String(raw.sender_name || raw.from || 'متابع');
   const commenterId = String(raw.sender_id || '');
   const content = String(raw.message || raw.text || raw.content || '');
@@ -43,10 +41,10 @@ export async function processInboundComment(userId: string, raw: any) {
 
   const isNegative = quickNegative(content);
 
-  // Match automation — try both the full post_id and the short form (without page prefix).
+  // Nashir's GET /comments response does NOT include post_id, so we cannot filter by post.
+  // Match by keyword across all active automations for this user instead.
   const { data: automations } = await supabase.from('comment_automations')
-    .select('*').eq('user_id', userId).eq('is_active', true)
-    .or(`post_id.eq.${postId},post_id.eq.${postIdShort}`);
+    .select('*').eq('user_id', userId).eq('is_active', true);
   const matched = (automations || []).find((a: any) => {
     const kws = (a.trigger_keywords || []) as string[];
     return kws.some((kw: string) => content.toLowerCase().includes(String(kw).toLowerCase()));
@@ -78,14 +76,11 @@ export async function processInboundComment(userId: string, raw: any) {
     try {
       await nashir.replyComment(key, commentId, matched.comment_reply);
     } catch {}
-    try {
-      // Send DM to the commenter. Compose body with attachment if any.
-      const dmBody = matched.dm_attachment_url
-        ? `${matched.dm_message}\n\n${matched.dm_attachment_url}`
-        : matched.dm_message;
-      await nashir.sendDM(key, { platform, recipient_id: commenterId, message: dmBody });
-    } catch (e: any) {
-      console.error('[comment automation DM]', e?.response?.status, e?.response?.data || e?.message);
+    // Note: Nashir API has no endpoint to initiate a fresh DM to a commenter.
+    // DMs can only be sent as replies to existing incoming messages (/messages/:id/reply).
+    // The dm_message is stored in the automation row for future use when Nashir adds this feature.
+    if (matched.dm_message) {
+      console.log('[comment automation] DM pending (Nashir has no initiate-DM endpoint):', commenterId);
     }
     await supabase.from('comments_inbox').update({ ai_replied: true }).eq('comment_id', commentId);
     await supabase.from('comment_automations').update({ triggered_count: (matched.triggered_count || 0) + 1 }).eq('id', matched.id);
@@ -139,8 +134,8 @@ export const commentsHandlers = {
       dm_attachment_url: a.dm_attachment_url || '',
       is_active: a.is_active !== false,
     };
-    if (!row.post_id || !row.comment_reply || !row.dm_message || !row.trigger_keywords.length) {
-      throw new Error('بيانات ناقصة: يجب وضع post_id، الكلمات المفتاحية، رد التعليق، ورسالة الخاص');
+    if (!row.comment_reply || !row.trigger_keywords.length) {
+      throw new Error('بيانات ناقصة: يجب وضع الكلمات المفتاحية ورد التعليق على الأقل');
     }
     if (a.id) {
       const { data } = await supabase.from('comment_automations')
@@ -192,14 +187,13 @@ export const commentsHandlers = {
   'comments:testAutomation': async ({ userId }: Ctx, a: any) => {
     if (!a?.trigger_keywords?.length) return { success: false, error: 'لا يوجد كلمات مفتاحية' };
     if (!a?.comment_reply) return { success: false, error: 'رد التعليق فارغ' };
-    if (!a?.dm_message) return { success: false, error: 'رسالة الخاص فارغة' };
-    const dmBody = a.dm_attachment_url
-      ? `${a.dm_message}\n\n${a.dm_attachment_url}`
-      : a.dm_message;
+    const dmBody = a.dm_message
+      ? (a.dm_attachment_url ? `${a.dm_message}\n\n${a.dm_attachment_url}` : a.dm_message)
+      : null;
     return {
       success: true,
       would_reply: true,
-      would_dm: true,
+      would_dm: !!dmBody,
       trigger_used: a.trigger_keywords[0],
       comment_reply: a.comment_reply,
       dm_message: dmBody,
