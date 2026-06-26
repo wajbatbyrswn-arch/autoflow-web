@@ -62,6 +62,10 @@ const ORDER_CONTRACT = `
 سيناريو 8 — العميل قال شيء غير مفهوم (هذيان/كلام عشوائي):
 - اطلب التوضيح مرة واحدة. لا تكرر السؤال أكثر من مرة في حال استمر اللبس.
 
+سيناريو 9 — رسالة العميل تحتوي على "[phone]" أو رقم 14+ خانة (فيسبوك أخفى الرقم):
+- لا تطلب الرقم بطريقتك المعتادة. اطلب من العميل صراحة كتابة الرقم بصيغة بها مسافات أو شرطات لتجاوز كاشف فيسبوك التلقائي.
+- مثال للنص الذي تطلبه: "فيسبوك يخفي الرقم تلقائياً. الرجاء كتابته هكذا: 077 074 8793 أو 0770-748-793".
+
 ⚠️ هذه السيناريوهات ثابتة في النظام. لا تتجاوزها ولا تخترع قواعد جديدة. أي تعارض بين شخصية المساعد وبين هذه السيناريوهات → السيناريوهات تفوز دائماً.
 
 عند طلب الزبون لمنتج أو خدمة، اتبع هذا التسلسل بالضبط على 3 مراحل، لا تتخطّ أي مرحلة:
@@ -231,6 +235,35 @@ function collectPhoneCandidates(obj: any, out: string[] = []): string[] {
 }
 
 /**
+ * Inside an attachment subtree specifically, also accept any PURE-DIGIT STRING value
+ * (after stripping formatting). Attachments are bounded — they describe message content,
+ * not metadata — so a string that's "just digits" inside an attachment is very likely
+ * the phone number Meta detected. Skips id-like keys.
+ */
+function findPureDigitStringInAttachments(obj: any): string | null {
+  if (obj == null) return null;
+  const stack: any[] = [obj];
+  while (stack.length) {
+    const node = stack.pop();
+    if (node == null) continue;
+    if (typeof node === 'string') {
+      const cleaned = node.replace(/[\s\-\(\)\+\.]/g, '');
+      if (/^\d{9,13}$/.test(cleaned) && looksLikeRealPhone(cleaned)) return cleaned;
+      continue;
+    }
+    if (typeof node === 'number') continue; // raw numbers in attachments are almost always IDs
+    if (Array.isArray(node)) { for (const v of node) stack.push(v); continue; }
+    if (typeof node === 'object') {
+      for (const k of Object.keys(node)) {
+        if (NON_PHONE_FIELDS.test(k)) continue;
+        stack.push((node as any)[k]);
+      }
+    }
+  }
+  return null;
+}
+
+/**
  * Resolve Meta privacy placeholders like "[phone]", "[email]", "[address]" that Facebook/IG
  * insert in message text when they auto-detect sensitive content. The actual value lives in
  * a separate attachment/entities field. We dig it out and inline it back into the text so
@@ -244,11 +277,19 @@ function resolveMetaPlaceholders(text: string, raw: any): string {
 
   const findPhoneInRaw = (): string | null => {
     try {
+      // Layer 1: phone-named keys anywhere in the payload
       const candidates = collectPhoneCandidates(raw, []);
       for (const c of candidates) {
         const cleaned = String(c).replace(/[\s\-\(\)\+\.]/g, '');
         const m = cleaned.match(/\d{9,13}/);
         if (m && looksLikeRealPhone(m[0])) return m[0];
+      }
+      // Layer 2: pure-digit strings inside attachments (Meta sometimes puts the phone
+      // as a bare value in attachment payloads without a phone-named key).
+      const a = raw?.attachments ?? raw?.attachment;
+      if (a) {
+        const fromAtt = findPureDigitStringInAttachments(a);
+        if (fromAtt) return fromAtt;
       }
     } catch {}
     return null;
@@ -265,6 +306,21 @@ function resolveMetaPlaceholders(text: string, raw: any): string {
     console.warn(`[normalize] Meta placeholder "${match}" found but no phone in raw attachments`);
     return match;
   });
+}
+
+/**
+ * Did Meta strip a phone number from this message? Either it left a "[phone]" placeholder,
+ * or it injected its own 14-17 digit ID in place of the customer's actual digits.
+ * Use this to detect "Meta privacy stripped the phone" so we can ask the customer to
+ * re-send with formatting that bypasses Meta's detector.
+ */
+function isMetaPhoneStripped(content: string): boolean {
+  if (!content) return false;
+  if (/\[(phone|tel|mobile|number|phone_number)\]/i.test(content)) return true;
+  // Stripped digits also show as a 14-17 digit run (Meta's internal ID).
+  const cleaned = content.replace(/[\s\-\(\)\+\.]/g, '');
+  if (/\d{14,18}/.test(cleaned)) return true;
+  return false;
 }
 
 /**
@@ -639,10 +695,16 @@ export async function processInbound(userId: string, raw: any): Promise<string> 
       { role: 'user', content: item.content },
     ]);
 
-    // 🛡️ SAFETY OVERRIDE: if we detected a valid phone but AI still replied with rejection,
-    // force-replace the reply. This bypasses Gemini's stubbornness when conversation history
-    // is biased toward rejection or when a user-saved prompt has conflicting validation rules.
-    if (detectedPhone) {
+    // 🛡️ SAFETY OVERRIDE A: if Meta stripped the phone (placeholder or ID injection)
+    // AND we couldn't recover the real number from attachments, override AI's reply with
+    // workaround instructions so the customer reformats and bypasses Meta's detector.
+    if (!detectedPhone && isMetaPhoneStripped(item.content)) {
+      console.warn(`[inbound OVERRIDE] Meta stripped phone, asking customer to reformat. content:`, item.content.slice(0, 200));
+      reply = `يبدو أن فيسبوك يخفي رقم هاتفك تلقائياً لحماية الخصوصية 🤔\nالرجاء كتابة الرقم بهذه الصيغة لتجاوز هذا الإخفاء:\n\n077 074 8793\nأو\n0770-748-793\nأو\nرقمي: ٠٧٧٠٧٤٨٧٩٣\n\n(ضع مسافات أو شرطات أو استخدم الأرقام العربية)`;
+    }
+    // 🛡️ SAFETY OVERRIDE B: if we DID detect a valid phone but AI still replied with rejection,
+    // force-replace the reply.
+    else if (detectedPhone) {
       const REJECTION_PATTERNS = [
         'الرجاء تزويدي',
         'هاتفك الفعلي', 'هاتفك الصحيح', 'هاتفك الشخصي',
