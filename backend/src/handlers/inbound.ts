@@ -336,13 +336,17 @@ function normalize(raw: any) {
   const mtype = String(raw.message_type || raw.type || 'dm').toLowerCase();
   const isComment = mtype === 'comment';
   const rawContent = String(raw.message ?? raw.text ?? raw.message_text ?? raw.body ?? raw.content ?? '');
-  // 1) Try to recover real phone digits from attachments when Meta inserted "[phone]" placeholder.
-  // 2) If still unresolved, silently strip the artifacts — but only if doing so leaves non-empty
-  //    content. If stripping would empty the message, keep the original so AI doesn't see ""
-  //    and skip the message entirely.
+  // 1) Try to recover real phone digits from attachments when Meta inserted a placeholder.
+  // 2) If still unresolved, replace [phone] placeholders with a short Arabic marker so both
+  //    the dashboard view and the AI see something meaningful (not just "[phone]").
+  // 3) If even that leaves the message empty, fall back to the raw content so we never
+  //    drop a customer message entirely.
   const resolved = resolveMetaPlaceholders(rawContent, raw);
-  const stripped = stripUnresolvedMetaArtifacts(resolved);
-  const content = stripped || resolved || rawContent;
+  let content = resolved.replace(/\[(phone|tel|mobile|number|phone_number)\]/gi, '📱(رقم)');
+  // Strip Meta's 14-18 digit internal IDs that masquerade as the phone (humans don't type these).
+  content = content.replace(/(?<!\d)\d{14,18}(?!\d)/g, '📱(رقم)');
+  content = content.replace(/\s+/g, ' ').trim();
+  if (!content) content = resolved || rawContent;
   return {
     replyId: raw.nashir_message_id ?? raw.id ?? raw.message_id,
     dedupKey: String(raw.platform_message_id ?? raw.nashir_message_id ?? raw.id ?? `gen_${Date.now()}`),
@@ -471,7 +475,14 @@ async function maybeExtractAndSaveOrder(
       if (/^(phone|customer_phone|name|customer_name|city|customer_city|area|customer_area|address)$/i.test(s)) return true;
       return false;
     };
-    if (isPlaceholder(orderData.customer_phone) || isPlaceholder(orderData.customer_name)) {
+    // Phone-specific check: a real phone has at least 7 digits anywhere in the string.
+    // This catches our "📱(رقم)" marker, "[phone]", and any non-digit text.
+    const isInvalidPhone = (v: any): boolean => {
+      if (isPlaceholder(v)) return true;
+      const digitCount = (String(v).match(/\d/g) || []).length;
+      return digitCount < 7;
+    };
+    if (isInvalidPhone(orderData.customer_phone) || isPlaceholder(orderData.customer_name)) {
       console.error('[inbound order REJECTED — placeholder values detected]', JSON.stringify(orderData));
       // Notify admin so they can manually take over
       createNotification(
