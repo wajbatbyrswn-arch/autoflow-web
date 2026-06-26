@@ -185,53 +185,86 @@ async function autoReplyEnabled(userId: string): Promise<boolean> {
 }
 
 /**
+ * Look like a real phone number (not a Facebook message ID or platform ID).
+ * Real phones: 9-13 digits, often start with 0 or country code.
+ * Reject anything 14+ digits (those are platform IDs).
+ */
+function looksLikeRealPhone(digits: string): boolean {
+  if (!digits) return false;
+  if (digits.length < 9 || digits.length > 13) return false;
+  return true;
+}
+
+/**
+ * Field names that NEVER contain a phone — these are platform internal IDs we must skip
+ * to avoid extracting message_id / page_id / sender_id as if they were a phone number.
+ */
+const NON_PHONE_FIELDS = /^(id|_id|mid|message_id|nashir_message_id|platform_message_id|sender_id|recipient_id|account_id|page_id|business_id|team_id|conversation_id|timestamp|created_at|updated_at|date|time|seq|sequence|version|hash|uid|guid)$/i;
+
+/**
+ * Walk an object and collect values from keys that LOOK like phone fields
+ * (key name contains phone/tel/mobile/contact/number) while explicitly skipping
+ * platform internal id fields.
+ */
+function collectPhoneCandidates(obj: any, out: string[] = []): string[] {
+  if (obj == null) return out;
+  if (typeof obj === 'string' || typeof obj === 'number') return out;
+  if (Array.isArray(obj)) {
+    for (const v of obj) collectPhoneCandidates(v, out);
+    return out;
+  }
+  if (typeof obj === 'object') {
+    for (const k of Object.keys(obj)) {
+      if (NON_PHONE_FIELDS.test(k)) continue;
+      const v = (obj as any)[k];
+      // If the key name strongly suggests a phone, harvest the value directly.
+      if (/^(phone|phone_number|phoneNumber|tel|telephone|mobile|number|contact_number|whatsapp)$/i.test(k)) {
+        if (typeof v === 'string' || typeof v === 'number') out.push(String(v));
+        else if (typeof v === 'object') collectPhoneCandidates(v, out);
+      } else {
+        // Descend into nested objects/arrays but only via the safe walk.
+        collectPhoneCandidates(v, out);
+      }
+    }
+  }
+  return out;
+}
+
+/**
  * Resolve Meta privacy placeholders like "[phone]", "[email]", "[address]" that Facebook/IG
- * inserts in message text when they auto-detect sensitive content. The actual value lives in
- * a separate attachment / entities field. We dig it out and inline it back into the text so
- * the AI sees the real number.
+ * insert in message text when they auto-detect sensitive content. The actual value lives in
+ * a separate attachment/entities field. We dig it out and inline it back into the text so
+ * the AI sees the real number — WITHOUT confusing it with platform IDs.
  */
 function resolveMetaPlaceholders(text: string, raw: any): string {
   if (!text) return text;
-  let out = text;
   const placeholderRegex = /\[(phone|tel|mobile|number|phone_number|email|address)\]/gi;
-  if (!placeholderRegex.test(out)) return out;
-  // Reset regex (test() mutates lastIndex on /g)
+  if (!placeholderRegex.test(text)) return text;
   placeholderRegex.lastIndex = 0;
 
-  // Helper: deep-scan raw for any 8-15 digit run
   const findPhoneInRaw = (): string | null => {
     try {
-      const buckets: any[] = [];
-      const push = (v: any) => { if (v !== undefined && v !== null) buckets.push(v); };
-      push(raw.attachments); push(raw.attachment); push(raw.payload);
-      push(raw.entities); push(raw.contact); push(raw.contacts);
-      for (const k of Object.keys(raw)) {
-        if (/phone|tel|mobile|contact|number/i.test(k)) push((raw as any)[k]);
-      }
-      // Last resort: scan the whole raw JSON
-      buckets.push(JSON.stringify(raw));
-      for (const b of buckets) {
-        const s = typeof b === 'string' ? b : JSON.stringify(b);
-        const cleaned = s.replace(/[\s\-\(\)\+\.]/g, '');
-        const m = cleaned.match(/\d{8,15}/);
-        if (m) return m[0];
+      const candidates = collectPhoneCandidates(raw, []);
+      for (const c of candidates) {
+        const cleaned = String(c).replace(/[\s\-\(\)\+\.]/g, '');
+        const m = cleaned.match(/\d{9,13}/);
+        if (m && looksLikeRealPhone(m[0])) return m[0];
       }
     } catch {}
     return null;
   };
 
-  out = out.replace(placeholderRegex, (match, kind: string) => {
+  return text.replace(placeholderRegex, (match, kind: string) => {
     const lower = String(kind).toLowerCase();
     if (lower === 'email') return raw.email || raw.sender_email || match;
-    // phone/tel/mobile/number/phone_number — extract real digits from raw
     const phone = findPhoneInRaw();
     if (phone) {
-      console.log(`[normalize] Meta placeholder "${match}" resolved to "${phone}"`);
+      console.log(`[normalize] Meta placeholder "${match}" resolved to phone "${phone}"`);
       return phone;
     }
+    console.warn(`[normalize] Meta placeholder "${match}" found but no phone in raw attachments`);
     return match;
   });
-  return out;
 }
 
 /**
@@ -265,42 +298,28 @@ function normalize(raw: any) {
 }
 
 /**
- * Server-side phone extractor: looks for 8-15 consecutive digits in the message text
- * AND in any attachment/payload field. This handles Instagram's auto-detected phone cards
- * where the actual digits get moved to an attachment instead of message text.
+ * Server-side phone extractor: looks for a real phone (9-13 digits) in:
+ * 1. The plain text content (no risk of catching IDs)
+ * 2. Raw payload fields whose key names match phone-related patterns (safe walker,
+ *    skips message_id, page_id, sender_id, timestamps, etc.)
+ * Refuses anything outside 9-13 digits — that's the range of real phone numbers worldwide.
+ * Anything else is almost certainly a platform internal ID.
  */
 function extractPhoneFromMessage(text: string, raw?: any): string | null {
-  // 1. Look in the plain text first (most reliable, no false positives)
+  // 1. Plain text: safe — the customer literally typed digits
   if (text) {
     const cleanedText = text.replace(/[\s\-\(\)\+\.]/g, '');
-    const m1 = cleanedText.match(/\d{8,15}/);
-    if (m1) return m1[0];
+    const m1 = cleanedText.match(/\d{9,13}/);
+    if (m1 && looksLikeRealPhone(m1[0])) return m1[0];
   }
-  // 2. If not in text, look in the raw payload. Instagram's "Phone number" card
-  //    typically puts digits in attachments[].payload or similar fields.
+  // 2. Raw payload — use the safe walker that ONLY visits phone-named fields
   if (raw) {
     try {
-      // Search attachment-related fields explicitly (avoids catching unrelated digits
-      // like message ids, timestamps, account ids).
-      const buckets: any[] = [];
-      const collect = (v: any) => { if (v !== undefined && v !== null) buckets.push(v); };
-      collect(raw.attachments);
-      collect(raw.attachment);
-      collect(raw.payload);
-      collect(raw.contact);
-      collect(raw.contacts);
-      collect(raw.message_text);
-      collect(raw.body);
-      collect(raw.content);
-      // Also any field whose name hints at phone/contact
-      for (const k of Object.keys(raw)) {
-        if (/phone|tel|mobile|contact|number/i.test(k)) collect((raw as any)[k]);
-      }
-      for (const b of buckets) {
-        const s = typeof b === 'string' ? b : JSON.stringify(b);
-        const cleaned = s.replace(/[\s\-\(\)\+\.]/g, '');
-        const m = cleaned.match(/\d{8,15}/);
-        if (m) return m[0];
+      const candidates = collectPhoneCandidates(raw, []);
+      for (const c of candidates) {
+        const cleaned = String(c).replace(/[\s\-\(\)\+\.]/g, '');
+        const m = cleaned.match(/\d{9,13}/);
+        if (m && looksLikeRealPhone(m[0])) return m[0];
       }
     } catch {}
   }
