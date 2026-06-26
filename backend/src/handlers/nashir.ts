@@ -29,6 +29,61 @@ export const nashir = {
   // Send a new DM to a user who commented. Nashir may expose this as POST /messages with recipient_id.
   sendDM: (key: string, { platform, recipient_id, message }: { platform: string; recipient_id: string; message: string }) =>
     client(key).post('/messages', { platform, recipient_id, message }).then(r => r.data),
+  // Facebook Private Reply: send a DM to a user who commented on a post (Meta supports this
+  // within 7 days of the comment). Tries the most likely Nashir endpoint patterns.
+  privateReplyToComment: async (key: string, commentId: number | string, message: string, pageId?: string) => {
+    const attempts = [
+      { url: `/comments/${commentId}/private-reply`, body: { message, ...(pageId ? { pageId } : {}) } },
+      { url: `/comments/${commentId}/dm`,            body: { message, ...(pageId ? { pageId } : {}) } },
+      { url: `/messages`,                            body: { in_reply_to_comment_id: String(commentId), message, ...(pageId ? { pageId } : {}) } },
+    ];
+    let lastErr: any = null;
+    for (const a of attempts) {
+      try {
+        const res = await client(key).post(a.url, a.body);
+        console.log(`[nashir privateReply] OK via ${a.url}`);
+        return res.data;
+      } catch (e: any) {
+        lastErr = e;
+        const status = e?.response?.status;
+        // 404 / 405 → endpoint doesn't exist, try next. Other codes → real error, stop.
+        if (status !== 404 && status !== 405 && status !== 400) {
+          console.error(`[nashir privateReply] ${a.url} failed:`, status, JSON.stringify(e?.response?.data).slice(0, 200));
+          throw e;
+        }
+        console.warn(`[nashir privateReply] ${a.url} returned ${status}, trying next`);
+      }
+    }
+    console.error('[nashir privateReply] all endpoints failed');
+    throw lastErr || new Error('No private-reply endpoint available on Nashir');
+  },
+  // Delete a comment from the platform (FB/IG). Tries the most likely Nashir endpoints.
+  deleteComment: async (key: string, commentId: number | string, pageId?: string) => {
+    const attempts = [
+      { method: 'delete' as const, url: `/comments/${commentId}` },
+      { method: 'post' as const,   url: `/comments/${commentId}/hide`, body: { ...(pageId ? { pageId } : {}) } },
+      { method: 'post' as const,   url: `/comments/${commentId}/delete`, body: { ...(pageId ? { pageId } : {}) } },
+    ];
+    let lastErr: any = null;
+    for (const a of attempts) {
+      try {
+        const res = a.method === 'delete'
+          ? await client(key).delete(a.url)
+          : await client(key).post(a.url, a.body || {});
+        console.log(`[nashir deleteComment] OK via ${a.method.toUpperCase()} ${a.url}`);
+        return res.data;
+      } catch (e: any) {
+        lastErr = e;
+        const status = e?.response?.status;
+        if (status !== 404 && status !== 405) {
+          console.error(`[nashir deleteComment] ${a.url} failed:`, status, JSON.stringify(e?.response?.data).slice(0, 200));
+          throw e;
+        }
+      }
+    }
+    console.error('[nashir deleteComment] all endpoints failed (Nashir likely does not support this)');
+    throw lastErr || new Error('No delete-comment endpoint on Nashir');
+  },
 };
 
 async function statusFor(userId: string, platform: 'facebook' | 'instagram') {

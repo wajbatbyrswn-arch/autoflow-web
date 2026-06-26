@@ -50,26 +50,36 @@ const ORDER_CONTRACT = `
 لو ناقص أي شيء، اسأل عنه بأدب ولا تفعل أي شيء آخر. لا تُسجّل أي طلب الآن. لا تُصدر الوسم [ORDER_READY] الآن.
 
 🅱️ المرحلة B — معاينة الفاتورة (بعد جمع كل شيء، وقبل التسجيل):
-ردّك التالي يجب أن يكون فاتورة منسّقة داخل الدردشة بهذا الشكل تقريباً:
+ردّك التالي يجب أن يكون فاتورة منسّقة بالقيم الحقيقية التي أعطاها العميل، بهذا الشكل:
 
 الفاتورة:
-- المنتج: {name} × {qty} = {subtotal}
-الإجمالي: {total}
+- المنتج: (اسم المنتج الفعلي) × (الكمية) = (السعر × الكمية)
+الإجمالي: (المجموع الفعلي بالأرقام)
 
 بياناتك:
-- الاسم: {customer_name}
-- الهاتف: {customer_phone}
-- العنوان: {customer_city} - {customer_area}
+- الاسم: (الاسم الذي كتبه العميل)
+- الهاتف: (الرقم الذي كتبه العميل — أرقام فقط)
+- العنوان: (المدينة - المنطقة كما كتبها)
 
 هل أؤكد الطلب؟ ✅
 
+⚠️ ممنوع منعاً باتاً كتابة أي قيمة كـ {customer_phone} أو [phone] أو ... أو أي قالب. اكتب القيمة الحقيقية حرفياً كما أعطاها العميل في الرسائل أعلاه.
 في هذه المرحلة لا تُصدر الوسم [ORDER_READY] بعد. انتظر تأكيد العميل النهائي.
 
 🅾️ المرحلة C — التسجيل النهائي:
 إذا ردّ العميل بإيجاب صريح ("نعم"، "تم"، "أكد"، "ok"، "yes"، "أكد الطلب")، عندها فقط:
-1) يجب أن يبدأ ردّك بالوسم التالي حرفياً بدون أي نص قبله — هذا الوسم إلزامي:
-[ORDER_READY]{"customer_name":"...","customer_phone":"...","customer_city":"...","customer_area":"...","products":[{"name":"...","quantity":1,"price":0}],"total_amount":0}[/ORDER_READY]
-ملاحظة: إذا لم تُرسل هذا الوسم بالشكل الصحيح (بما فيه JSON صحيح)، لن يُسجَّل الطلب في النظام أبداً — حتى لو أخبرت العميل أنه تسجّل.
+1) يجب أن يبدأ ردّك بالوسم التالي حرفياً بدون أي نص قبله. استبدل القيم بين علامتي التنصيص بالقيم الحقيقية التي كتبها العميل (وليس بقوالب أو placeholders):
+
+مثال (إذا كان اسم العميل "محمد" ورقمه "0791234567" والعنوان "عمّان - الدوار السابع" ومنتج "خدمة الرد الذكي" بسعر 40):
+[ORDER_READY]{"customer_name":"محمد","customer_phone":"0791234567","customer_city":"عمّان","customer_area":"الدوار السابع","products":[{"name":"خدمة الرد الذكي","quantity":1,"price":40}],"total_amount":40}[/ORDER_READY]
+
+⛔ ممنوع تماماً استخدام القيم الحرفية التالية كـ phone أو name أو city أو area:
+   - "..."
+   - "[phone]" أو "[name]" أو "[customer_phone]"
+   - "{customer_phone}" أو "{phone}"
+   - "phone" أو "name" كنص خام
+أي طلب يحتوي على أي من هذه القيم سيُرفض ولن يُسجَّل، وسيتم تنبيه الإدارة. استخدم القيمة الحقيقية التي قالها العميل حرفياً.
+
 2) بعد الوسم مباشرةً (في نفس الرد) أضف: "تم تسجيل طلبك بنجاح. سنتواصل معك للتأكيد قريباً 🌹"
 
 ⚠️ لا تكرّر الوسم ولا تُصدره مرة ثانية في نفس المحادثة بعد التسجيل.
@@ -166,6 +176,37 @@ async function maybeExtractAndSaveOrder(
   try {
     const rawJson = match[1].trim().replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim();
     const orderData = JSON.parse(rawJson);
+
+    // Reject placeholder values (AI sometimes emits template syntax instead of real data)
+    const isPlaceholder = (v: any): boolean => {
+      if (!v) return true;
+      const s = String(v).trim();
+      if (!s) return true;
+      if (s === '...' || s === '…') return true;
+      // [phone], [name], {customer_phone}, etc.
+      if (/^[\[\{\(].*?[\]\}\)]$/.test(s)) return true;
+      // bare template words
+      if (/^(phone|customer_phone|name|customer_name|city|customer_city|area|customer_area|address)$/i.test(s)) return true;
+      return false;
+    };
+    if (isPlaceholder(orderData.customer_phone) || isPlaceholder(orderData.customer_name)) {
+      console.error('[inbound order REJECTED — placeholder values detected]', JSON.stringify(orderData));
+      // Notify admin so they can manually take over
+      createNotification(
+        userId, 'complaint',
+        `⚠️ فشل تسجيل طلب — الذكاء أرسل قالباً فارغاً`,
+        `العميل: ${senderName}\nالمنصة: ${platform}\n\nالذكاء حاول تسجيل طلب بقيم placeholder بدل القيم الحقيقية:\n${JSON.stringify(orderData, null, 2).slice(0, 500)}\n\nيرجى التواصل مع العميل يدوياً لإكمال الطلب.`,
+        convId, { rejected: true, raw: orderData }
+      ).catch(() => {});
+      // Pause AI on this conversation so admin can take over
+      await supabase.from('conversations')
+        .update({ ai_paused_until: new Date(Date.now() + 2 * 3600 * 1000).toISOString() })
+        .eq('id', convId);
+      // Strip the bad tag from reply
+      return reply.replace(/\[ORDER_READY\][\s\S]*?\[\/ORDER_READY\]/g, '').trim()
+        + '\n\nسأقوم بمراجعة طلبك مع الفريق وسنعود إليك قريباً.';
+    }
+
     const products = orderData.products || [];
     const total = orderData.total_amount
       || products.reduce((s: number, p: any) => s + ((Number(p.price) || 0) * (Number(p.quantity) || 1)), 0);

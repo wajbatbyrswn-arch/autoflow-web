@@ -61,13 +61,17 @@ export async function processInboundComment(userId: string, raw: any) {
   const { data: profile } = await supabase.from('user_profiles')
     .select('auto_delete_bad_comments, ai_reply_comments_enabled').eq('user_id', userId).single();
 
-  // Auto-delete bad
+  // Auto-delete bad: try to delete from platform via Nashir, AND mark locally
   if (isNegative && profile?.auto_delete_bad_comments && key) {
+    let platformDeleted = false;
     try {
-      // Nashir doesn't expose a single delete endpoint here; use a hide attempt.
-      // Many platforms allow hiding by replying with an empty action OR via REST. We mark as deleted locally.
-      await supabase.from('comments_inbox').update({ deleted: true }).eq('comment_id', commentId);
-    } catch {}
+      await nashir.deleteComment(key, commentId);
+      platformDeleted = true;
+    } catch (e: any) {
+      console.error('[auto-delete bad comment]', e?.response?.status, e?.message);
+    }
+    await supabase.from('comments_inbox').update({ deleted: true }).eq('comment_id', commentId);
+    console.log(`[auto-delete] comment ${commentId} hidden (platform_deleted=${platformDeleted})`);
     return;
   }
 
@@ -76,11 +80,17 @@ export async function processInboundComment(userId: string, raw: any) {
     try {
       await nashir.replyComment(key, commentId, matched.comment_reply);
     } catch {}
-    // Note: Nashir API has no endpoint to initiate a fresh DM to a commenter.
-    // DMs can only be sent as replies to existing incoming messages (/messages/:id/reply).
-    // The dm_message is stored in the automation row for future use when Nashir adds this feature.
+    // Try Facebook Private Reply via Nashir (works within 7 days of comment on Meta).
     if (matched.dm_message) {
-      console.log('[comment automation] DM pending (Nashir has no initiate-DM endpoint):', commenterId);
+      try {
+        const dmBody = matched.dm_attachment_url
+          ? `${matched.dm_message}\n\n${matched.dm_attachment_url}`
+          : matched.dm_message;
+        await nashir.privateReplyToComment(key, commentId, dmBody);
+        console.log('[comment automation] private reply sent to commenter');
+      } catch (e: any) {
+        console.error('[comment automation] private reply failed:', e?.response?.status, JSON.stringify(e?.response?.data || e?.message).slice(0, 200));
+      }
     }
     await supabase.from('comments_inbox').update({ ai_replied: true }).eq('comment_id', commentId);
     await supabase.from('comment_automations').update({ triggered_count: (matched.triggered_count || 0) + 1 }).eq('id', matched.id);
@@ -175,9 +185,24 @@ export const commentsHandlers = {
   },
 
   // ---- Delete an individual comment (manual moderation) ----
+  // Tries to delete from FB/IG via Nashir, then marks as hidden locally regardless.
   'comments:deleteComment': async ({ userId }: Ctx, { id }: any) => {
+    const { data: c } = await supabase.from('comments_inbox').select('comment_id').eq('id', id).eq('user_id', userId).single();
+    let platformDeleted = false;
+    let platformError: string | null = null;
+    if (c?.comment_id) {
+      const key = await nashirKey(userId);
+      if (key) {
+        try {
+          await nashir.deleteComment(key, c.comment_id);
+          platformDeleted = true;
+        } catch (e: any) {
+          platformError = e?.response?.data?.error || e?.response?.data?.message || e?.message || 'فشل الحذف من المنصة';
+        }
+      }
+    }
     await supabase.from('comments_inbox').update({ deleted: true }).eq('id', id).eq('user_id', userId);
-    return { success: true };
+    return { success: true, platform_deleted: platformDeleted, platform_error: platformError };
   },
 
   /**

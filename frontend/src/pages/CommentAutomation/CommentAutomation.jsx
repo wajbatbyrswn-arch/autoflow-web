@@ -63,15 +63,16 @@ export default function CommentAutomation() {
   async function deleteComment(id) {
     const ok = await confirm({
       title: 'حذف التعليق',
-      message: 'سيتم إخفاء التعليق من القائمة. هل تريد المتابعة؟',
+      message: 'سنحاول حذفه من المنصة (فيسبوك/إنستغرام) وإخفاءه من الداشبورد.',
       confirmText: 'نعم، احذف',
       dangerous: true,
       rememberKey: 'comment_delete',
     })
     if (!ok) return
-    await window.api?.comments?.deleteComment?.(id)
+    const res = await window.api?.comments?.deleteComment?.(id)
     setComments(prev => prev.map(c => c.id === id ? { ...c, deleted: true } : c))
-    toast.success('تم الحذف')
+    if (res?.platform_deleted) toast.success('تم الحذف من المنصة والداشبورد ✓')
+    else toast('تم الإخفاء من الداشبورد. لم نتمكن من حذفه من المنصة — يرجى الحذف يدوياً من فيسبوك/إنستغرام', { icon: 'ℹ️', duration: 6000 })
   }
 
   async function saveSettings(patch) {
@@ -203,8 +204,10 @@ export default function CommentAutomation() {
             <Sparkles size={18} />
             <div>
               <strong>كيف تعمل اتمتة التعليقات؟</strong>
-              <p>عندما يعلّق أي شخص بكلمة من الكلمات المفتاحية على أي منشور، يتم تلقائياً الرد العلني على تعليقه. الرد الذكي يتوقف تلقائياً لأي تعليق طابق الكلمات المفتاحية.</p>
-              <p style={{marginTop:6, opacity:.7, fontSize:12}}>ملاحظة: رسالة الخاص (DM) محفوظة للمستقبل — Nashir لا يدعم إرسال DM جديد للمعلّقين حالياً. سيُرسَل الخاص لهم عند مراسلتهم لك أولاً.</p>
+              <p>عندما يعلّق أي شخص بكلمة من الكلمات المفتاحية على أي منشور، يتم تلقائياً:
+                1) الرد العلني على تعليقه برسالة "الرد العام"،
+                2) إرسال "رسالة الخاص" (DM) للمعلّق عبر Facebook Private Reply (يعمل خلال 7 أيام من التعليق).
+                الرد الذكي يتوقف تلقائياً لأي تعليق طابق الكلمات المفتاحية.</p>
             </div>
           </div>
 

@@ -131,6 +131,14 @@ export default function Admin() {
                     ))}
                   </select>
                   <div style={{ fontSize: 10, opacity: .5, marginTop: 2 }}>اتركه فارغاً = كل الرسائل</div>
+                  <PlatformsCheckboxes user={u} onChange={(platforms) => {
+                    rpc('admin:setLinkedPlatforms', { target_user_id: u.user_id, platforms })
+                      .then(() => {
+                        setUsers(prev => prev.map(x => x.user_id === u.user_id ? { ...x, nashir_linked_platforms: platforms } : x))
+                        toast.success('تم تحديث المنصات')
+                      })
+                      .catch(e => toast.error(e.message))
+                  }} />
                 </td>
                 <td style={{ ...td, minWidth: 260 }}>
                   <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
@@ -255,6 +263,30 @@ function TelegramModal({ state, setState, onSaved }) {
           </button>
         )}
       </div>
+    </div>
+  )
+}
+
+function PlatformsCheckboxes({ user, onChange }) {
+  const current = Array.isArray(user.nashir_linked_platforms) ? user.nashir_linked_platforms : []
+  const PLATFORMS = [
+    { key: 'facebook',  label: '📘 FB' },
+    { key: 'instagram', label: '📸 IG' },
+    { key: 'whatsapp',  label: '🟢 WA' },
+    { key: 'telegram',  label: '✈️ TG' },
+  ]
+  function toggle(key) {
+    const next = current.includes(key) ? current.filter(p => p !== key) : [...current, key]
+    onChange(next)
+  }
+  return (
+    <div style={{ marginTop: 6, display: 'flex', gap: 4, flexWrap: 'wrap', borderTop: '1px dashed var(--border-color,#2a2e37)', paddingTop: 6 }}>
+      {PLATFORMS.map(p => (
+        <label key={p.key} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, cursor: 'pointer', padding: '2px 6px', borderRadius: 6, background: current.includes(p.key) ? 'rgba(108,71,255,0.2)' : 'transparent', border: '1px solid ' + (current.includes(p.key) ? 'var(--accent,#6C47FF)' : 'var(--border-color,#2a2e37)') }}>
+          <input type="checkbox" checked={current.includes(p.key)} onChange={() => toggle(p.key)} style={{ margin: 0 }} />
+          {p.label}
+        </label>
+      ))}
     </div>
   )
 }

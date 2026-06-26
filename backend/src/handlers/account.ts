@@ -157,6 +157,28 @@ export const accountHandlers = {
     try { return await nashir.accounts(key); } catch { return []; }
   },
 
+  // Admin manually sets which platforms appear as "connected" in the user's dashboard.
+  // Use this when the admin has linked accounts on Nashir but wants the user to see the
+  // status immediately, without waiting for first traffic or relying on page-id lookups.
+  'admin:setLinkedPlatforms': async ({ userId }: Ctx, { target_user_id, platforms }: any) => {
+    await requireAdmin(userId);
+    const allowed = ['facebook', 'instagram', 'whatsapp', 'telegram'];
+    const clean = Array.isArray(platforms)
+      ? platforms.map((p: any) => String(p || '').toLowerCase()).filter((p: string) => allowed.includes(p))
+      : [];
+    await supabase.from('user_profiles').update({ nashir_linked_platforms: clean }).eq('user_id', target_user_id);
+    if (clean.length) {
+      const names = clean.map(p => p === 'facebook' ? 'فيسبوك' : p === 'instagram' ? 'إنستغرام' : p === 'whatsapp' ? 'واتساب' : 'تلغرام').join('، ');
+      createNotification(
+        target_user_id, 'system',
+        '✅ تم ربط حساباتك',
+        `قام فريق AutoFlow بربط منصاتك. المنصات المربوطة: ${names}. يمكنك مراجعة الإعدادات > المنصات.`,
+        null, {}
+      ).catch(() => {});
+    }
+    return { success: true, platforms: clean };
+  },
+
   // ---- Meta accounts (connected pages) ----
   'meta:getAccounts': async ({ userId }: Ctx) => {
     const { data } = await supabase.from('meta_accounts').select('*').eq('user_id', userId).eq('is_active', 1).order('id');
