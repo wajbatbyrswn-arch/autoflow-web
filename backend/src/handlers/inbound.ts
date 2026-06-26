@@ -185,6 +185,56 @@ async function autoReplyEnabled(userId: string): Promise<boolean> {
 }
 
 /**
+ * Resolve Meta privacy placeholders like "[phone]", "[email]", "[address]" that Facebook/IG
+ * inserts in message text when they auto-detect sensitive content. The actual value lives in
+ * a separate attachment / entities field. We dig it out and inline it back into the text so
+ * the AI sees the real number.
+ */
+function resolveMetaPlaceholders(text: string, raw: any): string {
+  if (!text) return text;
+  let out = text;
+  const placeholderRegex = /\[(phone|tel|mobile|number|phone_number|email|address)\]/gi;
+  if (!placeholderRegex.test(out)) return out;
+  // Reset regex (test() mutates lastIndex on /g)
+  placeholderRegex.lastIndex = 0;
+
+  // Helper: deep-scan raw for any 8-15 digit run
+  const findPhoneInRaw = (): string | null => {
+    try {
+      const buckets: any[] = [];
+      const push = (v: any) => { if (v !== undefined && v !== null) buckets.push(v); };
+      push(raw.attachments); push(raw.attachment); push(raw.payload);
+      push(raw.entities); push(raw.contact); push(raw.contacts);
+      for (const k of Object.keys(raw)) {
+        if (/phone|tel|mobile|contact|number/i.test(k)) push((raw as any)[k]);
+      }
+      // Last resort: scan the whole raw JSON
+      buckets.push(JSON.stringify(raw));
+      for (const b of buckets) {
+        const s = typeof b === 'string' ? b : JSON.stringify(b);
+        const cleaned = s.replace(/[\s\-\(\)\+\.]/g, '');
+        const m = cleaned.match(/\d{8,15}/);
+        if (m) return m[0];
+      }
+    } catch {}
+    return null;
+  };
+
+  out = out.replace(placeholderRegex, (match, kind: string) => {
+    const lower = String(kind).toLowerCase();
+    if (lower === 'email') return raw.email || raw.sender_email || match;
+    // phone/tel/mobile/number/phone_number — extract real digits from raw
+    const phone = findPhoneInRaw();
+    if (phone) {
+      console.log(`[normalize] Meta placeholder "${match}" resolved to "${phone}"`);
+      return phone;
+    }
+    return match;
+  });
+  return out;
+}
+
+/**
  * Normalize Nashir's real webhook payload, e.g.:
  * { business_id, team_id, platform:"facebook"|"instagram", message_type:"dm"|"comment",
  *   message, sender_id, sender_name, page_id, platform_message_id, nashir_message_id, account_id }
@@ -193,6 +243,9 @@ function normalize(raw: any) {
   const base = String(raw.platform || raw.channel || 'facebook').toLowerCase().replace('_dm', '').replace('_comment', '');
   const mtype = String(raw.message_type || raw.type || 'dm').toLowerCase();
   const isComment = mtype === 'comment';
+  const rawContent = String(raw.message ?? raw.text ?? raw.message_text ?? raw.body ?? raw.content ?? '');
+  // Replace Meta privacy placeholders like "[phone]" with the actual digits from attachments.
+  const content = resolveMetaPlaceholders(rawContent, raw);
   return {
     // The id used to reply via Nashir REST is the internal nashir_message_id.
     // Numeric internal id used to reply via Nashir REST (kept separately for manual replies).
@@ -206,7 +259,7 @@ function normalize(raw: any) {
     platform: base,
     senderId: String(raw.sender_id ?? raw.from ?? raw.senderId ?? ''),
     senderName: String(raw.sender_name ?? raw.senderName ?? raw.name ?? 'عميل'),
-    content: String(raw.message ?? raw.text ?? raw.message_text ?? raw.body ?? raw.content ?? ''),
+    content,
     pageId: raw.page_id ?? raw.pageId ?? null,
   };
 }
