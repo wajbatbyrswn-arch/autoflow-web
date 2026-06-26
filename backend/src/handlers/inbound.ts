@@ -45,18 +45,24 @@ const ORDER_CONTRACT = `
 4) المدينة (customer_city)
 5) المنطقة/التفاصيل (customer_area)
 
-⛔ قواعد قبول/رفض البيانات (كن ذكياً، ليس متشدداً):
+⛔ قواعد قبول البيانات (بسيطة، لا تخالفها أبداً):
 
-📞 رقم الهاتف:
-- أي نص يحتوي على 7 أرقام أو أكثر = رقم هاتف صحيح. اقبله فوراً واستخرج الأرقام منه.
-- أمثلة مقبولة 100% (لا ترفضها أبداً): "0770748793"، "0767556545"، "0791234567"، "07 7074 8793"، "+962770748793"، "962-77-074-8793".
-- ارفض فقط إذا لم يحتوِ النص على أي أرقام أو أقل من 7 أرقام (مثال: العميل كتب "عمر" أو "نعم" بدل الرقم) — عندها قل: "هل تقصد كتابة رقم الهاتف؟ فضلاً أرسله أرقاماً مثل 0791234567".
-- 🚨 إذا طلبت رقم الهاتف مرتين أو أكثر في هذه المحادثة، توقف عن الطلب مجدداً. قل للعميل: "يبدو أن هناك مشكلة في استقبال الرقم. فضلاً اكتبه في رسالة نصية فقط (بدون بطاقات أو أزرار)" واقبل أي رد فيه أرقام بعدها.
+📞 رقم الهاتف — قاعدة واحدة فقط:
+أي رسالة من العميل تحتوي على 8 أرقام متتالية أو أكثر = رقم هاتف صحيح. خذه فوراً وانتقل للسؤال التالي.
+أمثلة لرسائل كلها مقبولة (الرقم بداخلها هو رقم الهاتف):
+- "0770748793"
+- "هذا رقم هاتفي 0770748793"
+- "رقمي 0791234567"
+- "07 7074 8793"
+- "+962770748793"
 
-👤 الاسم: اقبل أي اسم يكتبه العميل كما هو (حرف واحد أو أكثر مقبول).
-🏙️ المدينة والمنطقة: اقبل أي نص يكتبه العميل. لا تشكّك في الأسماء.
+❌ ممنوع منعاً باتاً:
+- ممنوع قول "رقم غير صحيح" أو "هناك مشكلة في استقبال الرقم" إذا الرسالة تحتوي على 8 أرقام أو أكثر.
+- ممنوع تكرار طلب الرقم بعد ما أعطاك العميل رسالة فيها 8 أرقام.
+- ممنوع طلب نمط معين (مثل "بدون مسافات" أو "ابدأ بـ 07").
 
-⚠️ القاعدة الذهبية: المعلومة "خاطئة" فقط إذا كانت بشكل واضح من نوع مختلف (مثلاً اسم مكتوب مكان رقم). أي معلومة من النوع الصحيح، اقبلها مهما كان شكلها.
+👤 الاسم: أي حرف أو كلمة يكتبها العميل = الاسم. اقبله.
+🏙️ المدينة والمنطقة: أي نص يكتبه العميل = العنوان. اقبله.
 
 ⚠️ قاعدة استخدام التاريخ: لا تستخدم بيانات من طلب قديم. اطلب البيانات من جديد لكل طلب جديد، لكن اقبل ما يعطيك العميل في الطلب الحالي من أول مرة.
 
@@ -149,6 +155,20 @@ function normalize(raw: any) {
     content: String(raw.message ?? raw.text ?? raw.message_text ?? raw.body ?? raw.content ?? ''),
     pageId: raw.page_id ?? raw.pageId ?? null,
   };
+}
+
+/**
+ * Server-side phone extractor: if the customer's message contains 8+ digits anywhere,
+ * pull them out. This is the safety net for when Gemini gets stuck rejecting valid phones.
+ * We inject the extracted number as a system note so the AI MUST treat it as the phone.
+ */
+function extractPhoneFromMessage(text: string): string | null {
+  if (!text) return null;
+  // Strip common phone formatting chars first
+  const cleaned = text.replace(/[\s\-\(\)\+\.]/g, '');
+  // Find any run of 8+ consecutive digits
+  const match = cleaned.match(/\d{8,15}/);
+  return match ? match[0] : null;
 }
 
 function stripMarkdown(text: string): string {
@@ -444,8 +464,15 @@ export async function processInbound(userId: string, raw: any): Promise<string> 
       ? `\n\n⚠️ [تنبيه داخلي للذكاء الاصطناعي — لا تُعرض هذه الرسالة للعميل: تم تسجيل طلب رقم ${existingOrder.order_number} في هذه المحادثة بالفعل. لا تُصدر الوسم [ORDER_READY] مجدداً تحت أي ظرف. واصل الحوار بشكل طبيعي فقط، ولا تطلب من العميل إعادة التأكيد.]`
       : '';
 
+    // Server-side phone extraction safety net: if the customer's message contains a phone,
+    // force the AI to use it instead of asking again. Solves the "AI keeps rejecting valid phones" loop.
+    const detectedPhone = extractPhoneFromMessage(item.content);
+    const phoneNote = detectedPhone
+      ? `\n\n🔒 [تنبيه نظام إلزامي للذكاء الاصطناعي — هذه ليست رسالة للعميل: رسالة العميل الحالية تحتوي على رقم هاتف صحيح وهو "${detectedPhone}". اعتمد هذا الرقم رسمياً كـ customer_phone للطلب. ممنوع منعاً باتاً أن ترفضه، أو تطلب رقماً آخر، أو تقول إن هناك مشكلة. انتقل فوراً للسؤال التالي عن المعلومة الناقصة (الاسم أو المدينة أو المنطقة)، أو اعرض الفاتورة إذا اكتملت كل البيانات.]`
+      : '';
+
     reply = await sendToAI(config, [
-      { role: 'system', content: system + summaryNote + orderNote },
+      { role: 'system', content: system + summaryNote + orderNote + phoneNote },
       ...liveMsgs,
       { role: 'user', content: item.content },
     ]);
