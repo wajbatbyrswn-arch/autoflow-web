@@ -188,165 +188,15 @@ async function autoReplyEnabled(userId: string): Promise<boolean> {
 }
 
 /**
- * Look like a real phone number (not a Facebook message ID or platform ID).
- * Real phones: 9-13 digits, often start with 0 or country code.
- * Reject anything 14+ digits (those are platform IDs).
- */
-function looksLikeRealPhone(digits: string): boolean {
-  if (!digits) return false;
-  if (digits.length < 9 || digits.length > 13) return false;
-  return true;
-}
-
-/**
- * Field names that NEVER contain a phone — these are platform internal IDs we must skip
- * to avoid extracting message_id / page_id / sender_id as if they were a phone number.
- */
-const NON_PHONE_FIELDS = /^(id|_id|mid|message_id|nashir_message_id|platform_message_id|sender_id|recipient_id|account_id|page_id|business_id|team_id|conversation_id|timestamp|created_at|updated_at|date|time|seq|sequence|version|hash|uid|guid)$/i;
-
-/**
- * Walk an object and collect values from keys that LOOK like phone fields
- * (key name contains phone/tel/mobile/contact/number) while explicitly skipping
- * platform internal id fields.
- */
-function collectPhoneCandidates(obj: any, out: string[] = []): string[] {
-  if (obj == null) return out;
-  if (typeof obj === 'string' || typeof obj === 'number') return out;
-  if (Array.isArray(obj)) {
-    for (const v of obj) collectPhoneCandidates(v, out);
-    return out;
-  }
-  if (typeof obj === 'object') {
-    for (const k of Object.keys(obj)) {
-      if (NON_PHONE_FIELDS.test(k)) continue;
-      const v = (obj as any)[k];
-      // If the key name strongly suggests a phone, harvest the value directly.
-      if (/^(phone|phone_number|phoneNumber|tel|telephone|mobile|number|contact_number|whatsapp)$/i.test(k)) {
-        if (typeof v === 'string' || typeof v === 'number') out.push(String(v));
-        else if (typeof v === 'object') collectPhoneCandidates(v, out);
-      } else {
-        // Descend into nested objects/arrays but only via the safe walk.
-        collectPhoneCandidates(v, out);
-      }
-    }
-  }
-  return out;
-}
-
-/**
- * Inside an attachment subtree specifically, also accept any PURE-DIGIT STRING value
- * (after stripping formatting). Attachments are bounded — they describe message content,
- * not metadata — so a string that's "just digits" inside an attachment is very likely
- * the phone number Meta detected. Skips id-like keys.
- */
-function findPureDigitStringInAttachments(obj: any): string | null {
-  if (obj == null) return null;
-  const stack: any[] = [obj];
-  while (stack.length) {
-    const node = stack.pop();
-    if (node == null) continue;
-    if (typeof node === 'string') {
-      const cleaned = node.replace(/[\s\-\(\)\+\.]/g, '');
-      if (/^\d{9,13}$/.test(cleaned) && looksLikeRealPhone(cleaned)) return cleaned;
-      continue;
-    }
-    if (typeof node === 'number') continue; // raw numbers in attachments are almost always IDs
-    if (Array.isArray(node)) { for (const v of node) stack.push(v); continue; }
-    if (typeof node === 'object') {
-      for (const k of Object.keys(node)) {
-        if (NON_PHONE_FIELDS.test(k)) continue;
-        stack.push((node as any)[k]);
-      }
-    }
-  }
-  return null;
-}
-
-/**
- * Resolve Meta privacy placeholders like "[phone]", "[email]", "[address]" that Facebook/IG
- * insert in message text when they auto-detect sensitive content. The actual value lives in
- * a separate attachment/entities field. We dig it out and inline it back into the text so
- * the AI sees the real number — WITHOUT confusing it with platform IDs.
- */
-function resolveMetaPlaceholders(text: string, raw: any): string {
-  if (!text) return text;
-  const placeholderRegex = /\[(phone|tel|mobile|number|phone_number|email|address)\]/gi;
-  if (!placeholderRegex.test(text)) return text;
-  placeholderRegex.lastIndex = 0;
-
-  const findPhoneInRaw = (): string | null => {
-    try {
-      // Layer 1: phone-named keys anywhere in the payload
-      const candidates = collectPhoneCandidates(raw, []);
-      for (const c of candidates) {
-        const cleaned = String(c).replace(/[\s\-\(\)\+\.]/g, '');
-        const m = cleaned.match(/\d{9,13}/);
-        if (m && looksLikeRealPhone(m[0])) return m[0];
-      }
-      // Layer 2: pure-digit strings inside attachments (Meta sometimes puts the phone
-      // as a bare value in attachment payloads without a phone-named key).
-      const a = raw?.attachments ?? raw?.attachment;
-      if (a) {
-        const fromAtt = findPureDigitStringInAttachments(a);
-        if (fromAtt) return fromAtt;
-      }
-    } catch {}
-    return null;
-  };
-
-  return text.replace(placeholderRegex, (match, kind: string) => {
-    const lower = String(kind).toLowerCase();
-    if (lower === 'email') return raw.email || raw.sender_email || match;
-    const phone = findPhoneInRaw();
-    if (phone) {
-      console.log(`[normalize] Meta placeholder "${match}" resolved to phone "${phone}"`);
-      return phone;
-    }
-    console.warn(`[normalize] Meta placeholder "${match}" found but no phone in raw attachments`);
-    return match;
-  });
-}
-
-/**
- * Silently remove Meta privacy artifacts (unresolved [phone] placeholders and 14-18 digit
- * platform IDs that Meta injects in place of customer-typed phones). We try resolveMetaPlaceholders
- * first; if it can't recover the real digits, we strip the artifact rather than asking the
- * customer to reformat — that's friction we don't want.
- */
-function stripUnresolvedMetaArtifacts(text: string): string {
-  if (!text) return text;
-  let out = text;
-  // Strip placeholders that couldn't be resolved
-  out = out.replace(/\[(phone|tel|mobile|number|phone_number|email|address)\]/gi, '');
-  // Strip Meta's 14-18 digit internal IDs (humans don't type these — real phones are 9-13 digits).
-  // Only strip if it appears as a standalone digit run, not part of a word.
-  out = out.replace(/(?<!\d)\d{14,18}(?!\d)/g, '');
-  // Collapse extra whitespace
-  out = out.replace(/\s+/g, ' ').trim();
-  return out;
-}
-
-/**
- * Normalize Nashir's real webhook payload, e.g.:
- * { business_id, team_id, platform:"facebook"|"instagram", message_type:"dm"|"comment",
- *   message, sender_id, sender_name, page_id, platform_message_id, nashir_message_id, account_id }
+ * Normalize Nashir's webhook payload.
+ * Per explicit user requirement: NO transformations on customer message content.
+ * Whatever Nashir delivers in `message`/`text`/`body` lands in `item.content` unchanged.
  */
 function normalize(raw: any) {
   const base = String(raw.platform || raw.channel || 'facebook').toLowerCase().replace('_dm', '').replace('_comment', '');
   const mtype = String(raw.message_type || raw.type || 'dm').toLowerCase();
   const isComment = mtype === 'comment';
-  const rawContent = String(raw.message ?? raw.text ?? raw.message_text ?? raw.body ?? raw.content ?? '');
-  // 1) Try to recover real phone digits from attachments when Meta inserted a placeholder.
-  // 2) If still unresolved, replace [phone] placeholders with a short Arabic marker so both
-  //    the dashboard view and the AI see something meaningful (not just "[phone]").
-  // 3) If even that leaves the message empty, fall back to the raw content so we never
-  //    drop a customer message entirely.
-  const resolved = resolveMetaPlaceholders(rawContent, raw);
-  let content = resolved.replace(/\[(phone|tel|mobile|number|phone_number)\]/gi, '📱(رقم)');
-  // Strip Meta's 14-18 digit internal IDs that masquerade as the phone (humans don't type these).
-  content = content.replace(/(?<!\d)\d{14,18}(?!\d)/g, '📱(رقم)');
-  content = content.replace(/\s+/g, ' ').trim();
-  if (!content) content = resolved || rawContent;
+  const content = String(raw.message ?? raw.text ?? raw.message_text ?? raw.body ?? raw.content ?? '');
   return {
     replyId: raw.nashir_message_id ?? raw.id ?? raw.message_id,
     dedupKey: String(raw.platform_message_id ?? raw.nashir_message_id ?? raw.id ?? `gen_${Date.now()}`),
@@ -395,33 +245,17 @@ function normalizeDigitsToLatin(text: string): string {
   return out;
 }
 
-function extractPhoneFromMessage(text: string, raw?: any): string | null {
-  // 1. Plain text: safe — the customer literally typed digits
-  if (text) {
-    // Normalize Arabic numerals + spelled words first, then strip every non-digit
-    const normalized = normalizeDigitsToLatin(text);
-    // Aggressively strip ALL non-digit characters (handles 0-7-7-0..., 0|7|7|0..., 0,7,7,0..., etc.)
-    const digitsOnly = normalized.replace(/\D/g, '');
-    const m1 = digitsOnly.match(/\d{9,13}/);
-    if (m1 && looksLikeRealPhone(m1[0])) return m1[0];
-    // Fall back to old behavior (strict separators) — keeps prior contract for cases
-    // where strip-all might glue two number tokens together.
-    const cleanedText = text.replace(/[\s\-\(\)\+\.]/g, '');
-    const m2 = cleanedText.match(/\d{9,13}/);
-    if (m2 && looksLikeRealPhone(m2[0])) return m2[0];
-  }
-  // 2. Raw payload — use the safe walker that ONLY visits phone-named fields
-  if (raw) {
-    try {
-      const candidates = collectPhoneCandidates(raw, []);
-      for (const c of candidates) {
-        const cleaned = String(c).replace(/[\s\-\(\)\+\.]/g, '');
-        const m = cleaned.match(/\d{9,13}/);
-        if (m && looksLikeRealPhone(m[0])) return m[0];
-      }
-    } catch {}
-  }
-  return null;
+/**
+ * Extract a real phone (9-13 digits) from the customer's text only.
+ * Used to populate phoneNote so AI knows the phone when it's clearly present.
+ * Never mutates item.content — just reads it.
+ */
+function extractPhoneFromMessage(text: string): string | null {
+  if (!text) return null;
+  const normalized = normalizeDigitsToLatin(text);
+  const digitsOnly = normalized.replace(/\D/g, '');
+  const m = digitsOnly.match(/\d{9,13}/);
+  return (m && m[0].length >= 9 && m[0].length <= 13) ? m[0] : null;
 }
 
 function stripMarkdown(text: string): string {
@@ -605,16 +439,15 @@ async function maybeCompressHistory(convId: number, userId: string, config: any)
 /** Process one inbound item: store it, get AI reply, and SEND it back via Nashir REST. Returns the reply text. */
 export async function processInbound(userId: string, raw: any): Promise<string> {
   const item = normalize(raw);
-  // Log raw payload for diagnostics when content looks suspicious (very short, IG attachments, etc.)
-  if (!item.content || item.content.length < 20) {
-    console.log('[inbound raw]', JSON.stringify({
-      platform: raw.platform, message_type: raw.message_type,
-      message: raw.message, text: raw.text, content: raw.content,
-      attachments: raw.attachments, attachment: raw.attachment,
-      payload: raw.payload, sticker_id: raw.sticker_id,
-      full_keys: Object.keys(raw || {}),
-    }).slice(0, 800));
-  }
+  // Always log the raw payload (truncated). Lets the user verify in Railway logs
+  // exactly what Nashir is delivering — no guessing.
+  console.log('[inbound raw]', JSON.stringify({
+    platform: raw.platform, message_type: raw.message_type,
+    sender_name: raw.sender_name, sender_id: raw.sender_id,
+    message: raw.message, text: raw.text, body: raw.body, content: raw.content,
+    attachments: raw.attachments, attachment: raw.attachment, payload: raw.payload,
+    full_keys: Object.keys(raw || {}),
+  }).slice(0, 1000));
   if (!item.content) { console.warn('[inbound] no content:', JSON.stringify(raw).slice(0, 400)); return ''; }
 
   // Comments take a separate code path: comment_automations + AI comment reply + auto-delete bad.
@@ -699,7 +532,7 @@ export async function processInbound(userId: string, raw: any): Promise<string> 
     // Build context: use compressed summary (if any) + recent live messages.
     // When phone was just detected, use a SMALLER window — this reduces Gemini's bias
     // from prior rejection messages in the conversation history.
-    const detectedPhonePeek = extractPhoneFromMessage(item.content, raw);
+    const detectedPhonePeek = extractPhoneFromMessage(item.content);
     const LIVE_WINDOW = detectedPhonePeek ? 4 : 10;
     const { data: recentMsgs } = await supabase.from('messages')
       .select('sender, content')
