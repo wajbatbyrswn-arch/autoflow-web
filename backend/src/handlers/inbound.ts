@@ -188,15 +188,61 @@ async function autoReplyEnabled(userId: string): Promise<boolean> {
 }
 
 /**
+ * If Nashir/Meta delivered "[phone]" in the message (Meta's privacy redaction),
+ * search ONLY in attachment-like fields for a 9-13 digit string and return it.
+ * Returns null if no plausible phone is found in attachments.
+ * Skips known platform-id fields so we never confuse a message_id for a phone.
+ */
+function recoverPhoneFromAttachments(raw: any): string | null {
+  const SKIP_KEYS = /^(id|_id|mid|message_id|nashir_message_id|platform_message_id|sender_id|recipient_id|account_id|page_id|business_id|team_id|conversation_id|timestamp|created_at|updated_at)$/i;
+  const sources = [raw?.attachments, raw?.attachment, raw?.payload, raw?.entities, raw?.contact, raw?.contacts];
+  for (const src of sources) {
+    if (src == null) continue;
+    try {
+      const stack: any[] = [src];
+      while (stack.length) {
+        const node = stack.pop();
+        if (node == null) continue;
+        if (typeof node === 'string') {
+          const cleaned = node.replace(/[\s\-\(\)\+\.]/g, '');
+          if (/^\d{9,13}$/.test(cleaned)) return cleaned;
+          continue;
+        }
+        if (typeof node === 'number') continue; // raw numbers in attachments are usually IDs
+        if (Array.isArray(node)) { for (const v of node) stack.push(v); continue; }
+        if (typeof node === 'object') {
+          for (const k of Object.keys(node)) {
+            if (SKIP_KEYS.test(k)) continue;
+            stack.push((node as any)[k]);
+          }
+        }
+      }
+    } catch {}
+  }
+  return null;
+}
+
+/**
  * Normalize Nashir's webhook payload.
- * Per explicit user requirement: NO transformations on customer message content.
- * Whatever Nashir delivers in `message`/`text`/`body` lands in `item.content` unchanged.
+ * Default: NO transformations — raw passthrough.
+ * Exception: if Meta inserted a "[phone]" placeholder AND we can find the real digits
+ *            in attachments, replace [phone] with the digits so the user sees the
+ *            phone they actually typed. If digits cannot be recovered, leave [phone]
+ *            as-is (transparent — user can see Meta hid it).
  */
 function normalize(raw: any) {
   const base = String(raw.platform || raw.channel || 'facebook').toLowerCase().replace('_dm', '').replace('_comment', '');
   const mtype = String(raw.message_type || raw.type || 'dm').toLowerCase();
   const isComment = mtype === 'comment';
-  const content = String(raw.message ?? raw.text ?? raw.message_text ?? raw.body ?? raw.content ?? '');
+  const rawContent = String(raw.message ?? raw.text ?? raw.message_text ?? raw.body ?? raw.content ?? '');
+  let content = rawContent;
+  if (/\[(phone|tel|mobile|number|phone_number)\]/i.test(rawContent)) {
+    const recovered = recoverPhoneFromAttachments(raw);
+    if (recovered) {
+      content = rawContent.replace(/\[(phone|tel|mobile|number|phone_number)\]/gi, recovered);
+      console.log(`[normalize] recovered phone from attachments: ${recovered}`);
+    }
+  }
   return {
     replyId: raw.nashir_message_id ?? raw.id ?? raw.message_id,
     dedupKey: String(raw.platform_message_id ?? raw.nashir_message_id ?? raw.id ?? `gen_${Date.now()}`),
