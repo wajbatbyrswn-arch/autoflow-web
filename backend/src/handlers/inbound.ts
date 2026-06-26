@@ -62,9 +62,8 @@ const ORDER_CONTRACT = `
 سيناريو 8 — العميل قال شيء غير مفهوم (هذيان/كلام عشوائي):
 - اطلب التوضيح مرة واحدة. لا تكرر السؤال أكثر من مرة في حال استمر اللبس.
 
-سيناريو 9 — رسالة العميل تحتوي على "[phone]" أو رقم 14+ خانة (فيسبوك أخفى الرقم):
-- لا تطلب الرقم بطريقتك المعتادة. اطلب من العميل صراحة كتابة الرقم بصيغة بها مسافات أو شرطات لتجاوز كاشف فيسبوك التلقائي.
-- مثال للنص الذي تطلبه: "فيسبوك يخفي الرقم تلقائياً. الرجاء كتابته هكذا: 077 074 8793 أو 0770-748-793".
+سيناريو 9 — رسالة العميل تبدو أنها كانت تحتوي رقم هاتف لكنها وصلتك ناقصة أو فارغة:
+- اطلب الرقم مرة أخرى بأسلوب طبيعي قصير (جملة واحدة، بدون شروحات تقنية). لا تذكر أي منصة أو سبب تقني.
 
 ⚠️ هذه السيناريوهات ثابتة في النظام. لا تتجاوزها ولا تخترع قواعد جديدة. أي تعارض بين شخصية المساعد وبين هذه السيناريوهات → السيناريوهات تفوز دائماً.
 
@@ -309,18 +308,22 @@ function resolveMetaPlaceholders(text: string, raw: any): string {
 }
 
 /**
- * Did Meta strip a phone number from this message? Either it left a "[phone]" placeholder,
- * or it injected its own 14-17 digit ID in place of the customer's actual digits.
- * Use this to detect "Meta privacy stripped the phone" so we can ask the customer to
- * re-send with formatting that bypasses Meta's detector.
+ * Silently remove Meta privacy artifacts (unresolved [phone] placeholders and 14-18 digit
+ * platform IDs that Meta injects in place of customer-typed phones). We try resolveMetaPlaceholders
+ * first; if it can't recover the real digits, we strip the artifact rather than asking the
+ * customer to reformat — that's friction we don't want.
  */
-function isMetaPhoneStripped(content: string): boolean {
-  if (!content) return false;
-  if (/\[(phone|tel|mobile|number|phone_number)\]/i.test(content)) return true;
-  // Stripped digits also show as a 14-17 digit run (Meta's internal ID).
-  const cleaned = content.replace(/[\s\-\(\)\+\.]/g, '');
-  if (/\d{14,18}/.test(cleaned)) return true;
-  return false;
+function stripUnresolvedMetaArtifacts(text: string): string {
+  if (!text) return text;
+  let out = text;
+  // Strip placeholders that couldn't be resolved
+  out = out.replace(/\[(phone|tel|mobile|number|phone_number|email|address)\]/gi, '');
+  // Strip Meta's 14-18 digit internal IDs (humans don't type these — real phones are 9-13 digits).
+  // Only strip if it appears as a standalone digit run, not part of a word.
+  out = out.replace(/(?<!\d)\d{14,18}(?!\d)/g, '');
+  // Collapse extra whitespace
+  out = out.replace(/\s+/g, ' ').trim();
+  return out;
 }
 
 /**
@@ -333,8 +336,10 @@ function normalize(raw: any) {
   const mtype = String(raw.message_type || raw.type || 'dm').toLowerCase();
   const isComment = mtype === 'comment';
   const rawContent = String(raw.message ?? raw.text ?? raw.message_text ?? raw.body ?? raw.content ?? '');
-  // Replace Meta privacy placeholders like "[phone]" with the actual digits from attachments.
-  const content = resolveMetaPlaceholders(rawContent, raw);
+  // 1) Try to recover real phone digits from attachments when Meta inserted "[phone]" placeholder.
+  // 2) If still unresolved, silently strip the artifacts so AI handles it as a natural "phone missing" case.
+  const resolved = resolveMetaPlaceholders(rawContent, raw);
+  const content = stripUnresolvedMetaArtifacts(resolved);
   return {
     // The id used to reply via Nashir REST is the internal nashir_message_id.
     // Numeric internal id used to reply via Nashir REST (kept separately for manual replies).
@@ -695,16 +700,9 @@ export async function processInbound(userId: string, raw: any): Promise<string> 
       { role: 'user', content: item.content },
     ]);
 
-    // 🛡️ SAFETY OVERRIDE A: if Meta stripped the phone (placeholder or ID injection)
-    // AND we couldn't recover the real number from attachments, override AI's reply with
-    // workaround instructions so the customer reformats and bypasses Meta's detector.
-    if (!detectedPhone && isMetaPhoneStripped(item.content)) {
-      console.warn(`[inbound OVERRIDE] Meta stripped phone, asking customer to reformat. content:`, item.content.slice(0, 200));
-      reply = `يبدو أن فيسبوك يخفي رقم هاتفك تلقائياً لحماية الخصوصية 🤔\nالرجاء كتابة الرقم بهذه الصيغة لتجاوز هذا الإخفاء:\n\n077 074 8793\nأو\n0770-748-793\nأو\nرقمي: ٠٧٧٠٧٤٨٧٩٣\n\n(ضع مسافات أو شرطات أو استخدم الأرقام العربية)`;
-    }
-    // 🛡️ SAFETY OVERRIDE B: if we DID detect a valid phone but AI still replied with rejection,
-    // force-replace the reply.
-    else if (detectedPhone) {
+    // 🛡️ SAFETY OVERRIDE: if we detected a valid phone but AI still replied with rejection,
+    // force-replace the reply with acceptance.
+    if (detectedPhone) {
       const REJECTION_PATTERNS = [
         'الرجاء تزويدي',
         'هاتفك الفعلي', 'هاتفك الصحيح', 'هاتفك الشخصي',
