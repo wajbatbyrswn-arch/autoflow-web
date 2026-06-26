@@ -484,6 +484,29 @@ async function maybeCompressHistory(convId: number, userId: string, config: any)
 
 /** Process one inbound item: store it, get AI reply, and SEND it back via Nashir REST. Returns the reply text. */
 export async function processInbound(userId: string, raw: any): Promise<string> {
+  // If the webhook payload has Meta's "[phone]" privacy placeholder, ask Nashir's REST
+  // for the FULL message — that endpoint often includes attachments/payload that the
+  // webhook strips out. We merge any new fields onto raw so normalize() can recover
+  // the real digits.
+  const rawTextPeek = String(raw.message ?? raw.text ?? raw.body ?? '');
+  if (/\[(phone|tel|mobile|number|phone_number)\]/i.test(rawTextPeek)) {
+    const msgId = raw.nashir_message_id ?? raw.id ?? raw.message_id;
+    if (msgId) {
+      try {
+        const key = await nashirKey(userId);
+        if (key) {
+          const full = await nashir.getMessage(key, msgId);
+          if (full && typeof full === 'object') {
+            raw = { ...raw, ...full, attachments: (full as any).attachments ?? raw.attachments };
+            console.log(`[inbound] enriched payload via Nashir getMessage(${msgId})`);
+          }
+        }
+      } catch (e: any) {
+        console.warn('[inbound] enrich getMessage failed:', e?.message || e);
+      }
+    }
+  }
+
   const item = normalize(raw);
   // Always log the raw payload (truncated). Lets the user verify in Railway logs
   // exactly what Nashir is delivering — no guessing.

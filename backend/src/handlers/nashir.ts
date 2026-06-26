@@ -25,6 +25,32 @@ export const nashir = {
   replyComment: (key: string, id: number | string, message: string, pageId?: string) =>
     client(key).post(`/comments/${id}/reply`, { message, ...(pageId ? { pageId } : {}) }).then(r => r.data),
   markRead: (key: string, id: number | string) => client(key).patch(`/messages/${id}/read`).then(r => r.data),
+  // Fetch full message details by ID. Used to enrich webhook payloads that only
+  // include the redacted text (e.g. "[phone]") — the single-message endpoint often
+  // returns attachments / contact / payload that the list endpoint omits.
+  getMessage: async (key: string, id: number | string): Promise<any | null> => {
+    const attempts = [
+      `/messages/${id}`,
+      `/messages/${id}?include=attachments`,
+      `/messages/${id}?expand=attachments,payload`,
+    ];
+    for (const url of attempts) {
+      try {
+        const res = await client(key).get(url);
+        const data = res.data?.data ?? res.data;
+        if (data && typeof data === 'object') {
+          console.log(`[nashir getMessage] OK via ${url}`);
+          return data;
+        }
+      } catch (e: any) {
+        const status = e?.response?.status;
+        if (status !== 404 && status !== 405) {
+          console.error(`[nashir getMessage] ${url} failed:`, status);
+        }
+      }
+    }
+    return null;
+  },
   createPost: (key: string, body: any) => client(key).post('/posts', body).then(r => r.data),
   // Send a new DM to a user who commented. Nashir may expose this as POST /messages with recipient_id.
   sendDM: (key: string, { platform, recipient_id, message }: { platform: string; recipient_id: string; message: string }) =>
