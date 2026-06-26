@@ -45,10 +45,18 @@ const ORDER_CONTRACT = `
 4) المدينة (customer_city)
 5) المنطقة/التفاصيل (customer_area)
 
-⛔ قواعد قبول البيانات (حازمة جداً):
-- أي رقم هاتف يكتبه العميل، اقبله حرفياً كما هو ولا ترفضه أبداً. مثال: "0767556545"، "0791234567"، "+962791234567"، "07 7074 8793" — كل هذه مقبولة. لا تطلب من العميل تنسيقاً معيناً، ولا تقل "رقم غير صحيح".
-- أي اسم، أي مدينة، أي منطقة يكتبها العميل — اقبلها كما هي. لا ترفض ولا تشكّك.
-- ⚠️ ممنوع رفض أي معلومة يعطيها العميل تحت أي ظرف. إذا تلقّيت معلومة، احفظها وانتقل للسؤال التالي.
+⛔ قواعد قبول/رفض البيانات (كن ذكياً، ليس متشدداً):
+
+📞 رقم الهاتف:
+- أي نص يحتوي على 7 أرقام أو أكثر = رقم هاتف صحيح. اقبله فوراً واستخرج الأرقام منه.
+- أمثلة مقبولة 100% (لا ترفضها أبداً): "0770748793"، "0767556545"، "0791234567"، "07 7074 8793"، "+962770748793"، "962-77-074-8793".
+- ارفض فقط إذا لم يحتوِ النص على أي أرقام أو أقل من 7 أرقام (مثال: العميل كتب "عمر" أو "نعم" بدل الرقم) — عندها قل: "هل تقصد كتابة رقم الهاتف؟ فضلاً أرسله أرقاماً مثل 0791234567".
+- 🚨 إذا طلبت رقم الهاتف مرتين أو أكثر في هذه المحادثة، توقف عن الطلب مجدداً. قل للعميل: "يبدو أن هناك مشكلة في استقبال الرقم. فضلاً اكتبه في رسالة نصية فقط (بدون بطاقات أو أزرار)" واقبل أي رد فيه أرقام بعدها.
+
+👤 الاسم: اقبل أي اسم يكتبه العميل كما هو (حرف واحد أو أكثر مقبول).
+🏙️ المدينة والمنطقة: اقبل أي نص يكتبه العميل. لا تشكّك في الأسماء.
+
+⚠️ القاعدة الذهبية: المعلومة "خاطئة" فقط إذا كانت بشكل واضح من نوع مختلف (مثلاً اسم مكتوب مكان رقم). أي معلومة من النوع الصحيح، اقبلها مهما كان شكلها.
 
 ⚠️ قاعدة استخدام التاريخ: لا تستخدم بيانات من طلب قديم. اطلب البيانات من جديد لكل طلب جديد، لكن اقبل ما يعطيك العميل في الطلب الحالي من أول مرة.
 
@@ -317,6 +325,16 @@ async function maybeCompressHistory(convId: number, userId: string, config: any)
 /** Process one inbound item: store it, get AI reply, and SEND it back via Nashir REST. Returns the reply text. */
 export async function processInbound(userId: string, raw: any): Promise<string> {
   const item = normalize(raw);
+  // Log raw payload for diagnostics when content looks suspicious (very short, IG attachments, etc.)
+  if (!item.content || item.content.length < 20) {
+    console.log('[inbound raw]', JSON.stringify({
+      platform: raw.platform, message_type: raw.message_type,
+      message: raw.message, text: raw.text, content: raw.content,
+      attachments: raw.attachments, attachment: raw.attachment,
+      payload: raw.payload, sticker_id: raw.sticker_id,
+      full_keys: Object.keys(raw || {}),
+    }).slice(0, 800));
+  }
   if (!item.content) { console.warn('[inbound] no content:', JSON.stringify(raw).slice(0, 400)); return ''; }
 
   // Comments take a separate code path: comment_automations + AI comment reply + auto-delete bad.
