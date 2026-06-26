@@ -339,6 +339,11 @@ function normalize(raw: any) {
   // 1) Try to recover real phone digits from attachments when Meta inserted "[phone]" placeholder.
   // 2) If still unresolved, silently strip the artifacts so AI handles it as a natural "phone missing" case.
   const resolved = resolveMetaPlaceholders(rawContent, raw);
+  // Track whether Meta hid a phone in this message (placeholder existed AND wasn't resolved
+  // to real digits). This signals to the AI that the customer DID send a phone but the
+  // platform stripped it — so we should ask for an anti-detection format.
+  const phonePlaceholderRegex = /\[(phone|tel|mobile|number|phone_number)\]/i;
+  const metaStrippedPhone = phonePlaceholderRegex.test(rawContent) && phonePlaceholderRegex.test(resolved);
   const content = stripUnresolvedMetaArtifacts(resolved);
   return {
     // The id used to reply via Nashir REST is the internal nashir_message_id.
@@ -354,6 +359,7 @@ function normalize(raw: any) {
     senderId: String(raw.sender_id ?? raw.from ?? raw.senderId ?? ''),
     senderName: String(raw.sender_name ?? raw.senderName ?? raw.name ?? 'عميل'),
     content,
+    metaStrippedPhone,
     pageId: raw.page_id ?? raw.pageId ?? null,
   };
 }
@@ -366,12 +372,47 @@ function normalize(raw: any) {
  * Refuses anything outside 9-13 digits — that's the range of real phone numbers worldwide.
  * Anything else is almost certainly a platform internal ID.
  */
+/** Convert Arabic-Indic digits (٠-٩) and Arabic spelled words to Latin digits. */
+function normalizeDigitsToLatin(text: string): string {
+  if (!text) return text;
+  let out = text;
+  // Arabic-Indic ٠-٩
+  out = out.replace(/[٠-٩]/g, ch => String('٠١٢٣٤٥٦٧٨٩'.indexOf(ch)));
+  // Extended Arabic-Indic ۰-۹ (Persian)
+  out = out.replace(/[۰-۹]/g, ch => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(ch)));
+  // Arabic words for digits
+  const wordToDigit: Record<string, string> = {
+    'صفر': '0', 'سفر': '0',
+    'واحد': '1', 'واحدة': '1', 'احد': '1',
+    'اثنين': '2', 'إثنين': '2', 'اثنان': '2', 'ثنين': '2',
+    'ثلاثة': '3', 'ثلاث': '3', 'تلاتة': '3', 'تلاث': '3',
+    'اربعة': '4', 'أربعة': '4', 'اربع': '4', 'أربع': '4',
+    'خمسة': '5', 'خمس': '5',
+    'ستة': '6', 'ست': '6',
+    'سبعة': '7', 'سبع': '7',
+    'ثمانية': '8', 'ثمانة': '8', 'تمانية': '8', 'تمان': '8',
+    'تسعة': '9', 'تسع': '9',
+  };
+  for (const [word, digit] of Object.entries(wordToDigit)) {
+    out = out.replace(new RegExp(`(?<![\\u0600-\\u06FF])${word}(?![\\u0600-\\u06FF])`, 'g'), digit);
+  }
+  return out;
+}
+
 function extractPhoneFromMessage(text: string, raw?: any): string | null {
   // 1. Plain text: safe — the customer literally typed digits
   if (text) {
-    const cleanedText = text.replace(/[\s\-\(\)\+\.]/g, '');
-    const m1 = cleanedText.match(/\d{9,13}/);
+    // Normalize Arabic numerals + spelled words first, then strip every non-digit
+    const normalized = normalizeDigitsToLatin(text);
+    // Aggressively strip ALL non-digit characters (handles 0-7-7-0..., 0|7|7|0..., 0,7,7,0..., etc.)
+    const digitsOnly = normalized.replace(/\D/g, '');
+    const m1 = digitsOnly.match(/\d{9,13}/);
     if (m1 && looksLikeRealPhone(m1[0])) return m1[0];
+    // Fall back to old behavior (strict separators) — keeps prior contract for cases
+    // where strip-all might glue two number tokens together.
+    const cleanedText = text.replace(/[\s\-\(\)\+\.]/g, '');
+    const m2 = cleanedText.match(/\d{9,13}/);
+    if (m2 && looksLikeRealPhone(m2[0])) return m2[0];
   }
   // 2. Raw payload — use the safe walker that ONLY visits phone-named fields
   if (raw) {
@@ -694,8 +735,14 @@ export async function processInbound(userId: string, raw: any): Promise<string> 
       ? `\n\n🔒 [تنبيه نظام إلزامي للذكاء الاصطناعي — هذه ليست رسالة للعميل: رسالة العميل الحالية تحتوي على رقم هاتف صحيح وهو "${detectedPhone}" (تم استخراجه من الرسالة أو من بطاقة Instagram). اعتمد هذا الرقم رسمياً كـ customer_phone للطلب. ممنوع منعاً باتاً أن ترفضه، أو تطلب رقماً آخر، أو تقول إن هناك مشكلة في استقبال الرقم. تجاهل أي رفض سابق منك في تاريخ هذه المحادثة. انتقل فوراً للسؤال التالي عن المعلومة الناقصة (الاسم أو المدينة أو المنطقة)، أو اعرض الفاتورة إذا اكتملت كل البيانات.]`
       : '';
 
+    // 📵 Meta-stripped-phone alert: العميل أرسل رقم لكن فيسبوك حجبه (كانت [phone] في النص الأصلي
+    // ولم نقدر نستخرج الأرقام الفعلية من الـ payload). نوجّه الذكاء الاصطناعي يطلب صيغة مضادة للحجب.
+    const metaHidPhoneNote = (item as any).metaStrippedPhone && !detectedPhone
+      ? `\n\n📵 [تنبيه نظام إلزامي للذكاء الاصطناعي — هذه ليست رسالة للعميل: العميل أرسل رقم هاتفه في الرسالة الأخيرة لكن فيسبوك حجبه تلقائياً لحماية الخصوصية. لا تتهم العميل بعدم إرسال الرقم، ولا تطلب الرقم بنفس الصيغة. بدلاً من ذلك، اعتذر بأدب واطلب منه إعادة كتابة الرقم بأحد هذه الصيغ المضادة للحجب فقط (لا تستخدم صيغة أخرى): 1) ضع شرطة بين كل رقمين مثل: 07-70-74-87-93 ، 2) أو اكتب الرقم بالكلمات العربية مثل: صفر سبعة سبعة صفر سبعة أربعة ثمانية سبعة تسعة ثلاثة ، 3) أو أرسل صورة (سكرين شوت) للرقم. اشرح للعميل أن هذا ليس خطأه بل قيود من فيسبوك. كن لطيفاً ومختصراً (جملتين كحد أقصى).]`
+      : '';
+
     reply = await sendToAI(config, [
-      { role: 'system', content: system + summaryNote + orderNote + phoneNote },
+      { role: 'system', content: system + summaryNote + orderNote + phoneNote + metaHidPhoneNote },
       ...liveMsgs,
       { role: 'user', content: item.content },
     ]);
