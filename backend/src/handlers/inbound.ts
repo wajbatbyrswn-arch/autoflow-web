@@ -230,6 +230,29 @@ function recoverPhoneFromAttachments(raw: any): string | null {
  *            phone they actually typed. If digits cannot be recovered, leave [phone]
  *            as-is (transparent — user can see Meta hid it).
  */
+/**
+ * Summarize any attachments inline so the dashboard shows SOMETHING when Nashir
+ * delivers a non-text DM (image / video / sticker / audio / file / contact card).
+ * Returns text like "[صورة: https://...] [ستيكر #12345]" — empty if no attachments.
+ */
+function summarizeAttachments(raw: any): string {
+  const parts: string[] = [];
+  const att = raw?.attachments ?? raw?.attachment ?? raw?.payload;
+  const arr = Array.isArray(att) ? att : att ? [att] : [];
+  for (const a of arr) {
+    if (a == null) continue;
+    if (typeof a === 'string') { parts.push(`[مرفق: ${a}]`); continue; }
+    if (typeof a !== 'object') continue;
+    const type = String(a.type || a.kind || a.mime || a.media_type || 'مرفق').toLowerCase();
+    const url = a.url || a.media_url || a.payload?.url || a.file_url || a.image_url || '';
+    const label = ({ image: 'صورة', video: 'فيديو', audio: 'صوت', voice: 'تسجيل صوتي', sticker: 'ستيكر', file: 'ملف', document: 'مستند', location: 'موقع', contact: 'جهة اتصال' } as any)[type] || type;
+    parts.push(url ? `[${label}: ${url}]` : `[${label}]`);
+  }
+  if (raw?.sticker_id) parts.push(`[ستيكر #${raw.sticker_id}]`);
+  if (raw?.location) parts.push(`[موقع جغرافي]`);
+  return parts.join(' ');
+}
+
 function normalize(raw: any) {
   const base = String(raw.platform || raw.channel || 'facebook').toLowerCase().replace('_dm', '').replace('_comment', '');
   const mtype = String(raw.message_type || raw.type || 'dm').toLowerCase();
@@ -242,6 +265,12 @@ function normalize(raw: any) {
       content = rawContent.replace(/\[(phone|tel|mobile|number|phone_number)\]/gi, recovered);
       console.log(`[normalize] recovered phone from attachments: ${recovered}`);
     }
+  }
+  // If text is empty but there are attachments (image/video/sticker/...) make sure
+  // SOMETHING shows in the dashboard so the user sees the message arrived.
+  if (!content.trim()) {
+    const att = summarizeAttachments(raw);
+    if (att) content = att;
   }
   return {
     replyId: raw.nashir_message_id ?? raw.id ?? raw.message_id,
@@ -549,6 +578,7 @@ export async function processInbound(userId: string, raw: any): Promise<string> 
         user_id: userId, conversation_id: conv!.id, nashir_message_id: item.dedupKey,
         nashir_reply_id: item.replyId ? String(item.replyId) : null,
         sender: 'customer', content: item.content, message_type: item.isComment ? 'comment' : 'dm', ai_suggestion: COMPLAINT_REPLY,
+        raw_payload: raw,
       });
     }
     // Pause AI for 2h on this conv
@@ -587,6 +617,7 @@ export async function processInbound(userId: string, raw: any): Promise<string> 
         user_id: userId, conversation_id: conv!.id, nashir_message_id: item.dedupKey,
         nashir_reply_id: item.replyId ? String(item.replyId) : null,
         sender: 'customer', content: item.content, message_type: item.isComment ? 'comment' : 'dm',
+        raw_payload: raw,
       });
     }
     emit(userId, `${item.base}:message`, { convId: conv!.id, platform: item.platform });
@@ -682,6 +713,7 @@ export async function processInbound(userId: string, raw: any): Promise<string> 
       user_id: userId, conversation_id: conv!.id, nashir_message_id: item.dedupKey,
       nashir_reply_id: item.replyId ? String(item.replyId) : null,
       sender: 'customer', content: item.content, message_type: item.isComment ? 'comment' : 'dm', ai_suggestion: reply,
+      raw_payload: raw,
     });
   }
   emit(userId, `${item.base}:message`, { convId: conv!.id, platform: item.platform });
