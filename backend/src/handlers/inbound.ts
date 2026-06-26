@@ -142,9 +142,27 @@ const ORDER_CONTRACT = `
 ... وهكذا حتى تكتمل كل البيانات، ثم اعرض الفاتورة، ثم انتظر "نعم" قبل إصدار الوسم.
 `;
 
+/**
+ * Strip phone/data-validation rules from user-saved system prompts.
+ * Old prompts (generated via SalesAgent wizard) contained "validate phone" rules
+ * that override our ORDER_CONTRACT and cause AI to reject valid phones.
+ * Sanitization runs every request so old saved prompts are neutralized transparently.
+ */
+function sanitizePersona(text: string): string {
+  if (!text) return text;
+  // Match any line that mentions validation/format/correctness near phone/data keywords
+  const badLinePattern = /^.*(تحقّق|تحقق|تحقّقي|تأكد|تأكّد|صحة|صحّة|صحيح|منطقي|صيغة|تنسيق|اطلبه مرة أخرى|اطلب الرقم|غير صحيح|ناقص).*?(هاتف|رقم|بيانات|معلومات).*$/gmu;
+  const badLinePattern2 = /^.*(هاتف|رقم).*?(تحقّق|تحقق|تأكد|صحة|صحّة|صحيح|منطقي|صيغة|تنسيق|اطلبه|غير صحيح|ناقص).*$/gmu;
+  let cleaned = text.replace(badLinePattern, '').replace(badLinePattern2, '');
+  // Collapse multiple blank lines
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n').trim();
+  return cleaned;
+}
+
 async function buildSystemPrompt(userId: string): Promise<string> {
   const { data: store } = await supabase.from('store_config').select('store_name, system_prompt').eq('user_id', userId).single();
-  const userPersona = store?.system_prompt || `أنت موظف مبيعات ذكي ومتعاون لمتجر "${store?.store_name || 'AutoFlow'}".`;
+  const rawPersona = store?.system_prompt || `أنت موظف مبيعات ذكي ومتعاون لمتجر "${store?.store_name || 'AutoFlow'}".`;
+  const userPersona = sanitizePersona(rawPersona);
   const { data: products } = await supabase.from('products').select('name, price, quantity').eq('user_id', userId).gt('quantity', 0);
   const productsBlock = products?.length
     ? '\n\n### المنتجات المتوفرة (المصدر الوحيد للأسعار) ###\n' + products.map(p => `- ${p.name}: ${p.price}، الكمية ${p.quantity}`).join('\n')
@@ -501,18 +519,23 @@ export async function processInbound(userId: string, raw: any): Promise<string> 
     const config = await resolveConfig(userId);
     const system = await buildSystemPrompt(userId);
 
-    // Build context: use compressed summary (if any) + last 10 live messages.
-    // This gives the AI a full picture without blowing the context window.
-    const LIVE_WINDOW = 10;
+    // Build context: use compressed summary (if any) + recent live messages.
+    // When phone was just detected, use a SMALLER window — this reduces Gemini's bias
+    // from prior rejection messages in the conversation history.
+    const detectedPhonePeek = extractPhoneFromMessage(item.content, raw);
+    const LIVE_WINDOW = detectedPhonePeek ? 4 : 10;
     const { data: recentMsgs } = await supabase.from('messages')
       .select('sender, content')
       .eq('conversation_id', conv!.id)
       .order('created_at', { ascending: false })
       .limit(LIVE_WINDOW);
 
-    // Reverse so oldest-first for the AI
+    // Reverse so oldest-first for the AI; also filter out our own past rejection messages
+    // so they don't keep biasing Gemini toward more rejections.
+    const REJECTION_FILTER = /الرجاء تزويدي برقم|هاتفك الفعلي|هاتفك الصحيح|رقم هاتف صحيح|مشكلة في استقبال|07xxxxxxxx|أحتاج رقم هاتف/;
     const liveMsgs = (recentMsgs || []).reverse()
       .filter((m: any) => m.content)
+      .filter((m: any) => !(detectedPhonePeek && m.sender === 'assistant' && REJECTION_FILTER.test(m.content)))
       .map((m: any) => ({ role: m.sender === 'customer' ? 'user' : 'assistant', content: m.content }));
 
     // Prepend compressed summary as a system note if it exists
@@ -532,7 +555,8 @@ export async function processInbound(userId: string, raw: any): Promise<string> 
     // Server-side phone extraction safety net: scans message text + raw payload (attachments).
     // Solves both the "AI keeps rejecting valid phones" loop AND Instagram's phone-card attachments
     // where the digits live in attachments[] instead of message text.
-    const detectedPhone = extractPhoneFromMessage(item.content, raw);
+    // (Reuse detectedPhonePeek computed above.)
+    const detectedPhone = detectedPhonePeek;
     const phoneNote = detectedPhone
       ? `\n\n🔒 [تنبيه نظام إلزامي للذكاء الاصطناعي — هذه ليست رسالة للعميل: رسالة العميل الحالية تحتوي على رقم هاتف صحيح وهو "${detectedPhone}" (تم استخراجه من الرسالة أو من بطاقة Instagram). اعتمد هذا الرقم رسمياً كـ customer_phone للطلب. ممنوع منعاً باتاً أن ترفضه، أو تطلب رقماً آخر، أو تقول إن هناك مشكلة في استقبال الرقم. تجاهل أي رفض سابق منك في تاريخ هذه المحادثة. انتقل فوراً للسؤال التالي عن المعلومة الناقصة (الاسم أو المدينة أو المنطقة)، أو اعرض الفاتورة إذا اكتملت كل البيانات.]`
       : '';
@@ -542,6 +566,28 @@ export async function processInbound(userId: string, raw: any): Promise<string> 
       ...liveMsgs,
       { role: 'user', content: item.content },
     ]);
+
+    // 🛡️ SAFETY OVERRIDE: if we detected a valid phone but AI still replied with rejection,
+    // force-replace the reply. This bypasses Gemini's stubbornness when conversation history
+    // is biased toward rejection or when a user-saved prompt has conflicting validation rules.
+    if (detectedPhone) {
+      const REJECTION_PATTERNS = [
+        'الرجاء تزويدي',
+        'هاتفك الفعلي', 'هاتفك الصحيح', 'هاتفك الشخصي',
+        'رقم هاتف صحيح', 'رقم صحيح', 'برقم صحيح',
+        'غير صحيح', 'مش رقم', 'ليس رقماً',
+        'مشكلة في استقبال', 'يبدو أن هناك مشكلة',
+        'أحتاج رقم', 'أحتاج إلى رقم',
+        'فضلاً اكتب', 'فضلاً اكتبه', 'فضلاً أرسل',
+        'أرجو منك تزويدي برقم',
+        'شكراً على المثال',
+      ];
+      const isRejection = REJECTION_PATTERNS.some(p => reply.includes(p));
+      if (isRejection) {
+        console.warn(`[inbound OVERRIDE] AI rejected valid phone "${detectedPhone}"; replacing reply. Original AI reply:`, reply.slice(0, 200));
+        reply = `تم تسجيل رقم هاتفك (${detectedPhone}) بنجاح ✓\nالآن من فضلك أكمل البيانات الناقصة (الاسم والعنوان) لأتمكن من تأكيد الطلب 🌹`;
+      }
+    }
 
     // Extract [ORDER_READY] tag → save order to DB, strip from reply
     reply = await maybeExtractAndSaveOrder(reply, userId, conv!.id, item.platform, item.senderName);
