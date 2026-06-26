@@ -29,11 +29,40 @@ const PAUSE_HOURS_COMPLAINT = 2;
 // AI from firing [ORDER_READY] before collecting all required customer info.
 const ORDER_CONTRACT = `
 
-### قواعد إلزامية لجمع وتسجيل الطلبات (لا تخالفها أبداً) ###
+### قواعد إلزامية لجمع وتسجيل الطلبات (لا تخالفها أبداً تحت أي ظرف) ###
 
 تنبيهات عامة:
 - لا تستخدم رموز Markdown مثل ** أو __ أو # في ردودك. اكتب نصاً عادياً.
 - ردودك مختصرة (3 جمل كحد أقصى) وبنفس لغة/لهجة العميل.
+
+### 📋 سيناريوهات معالجة المعلومات (ثابتة، لا تتغير) ###
+
+سيناريو 1 — العميل أرسل رقم هاتف:
+- إذا رأيت في رسالة العميل أي تسلسل من 8 أرقام أو أكثر (سواء "0770748793" أو "07 7074 8793" أو "+962770748793") → اقبله فوراً، احفظه كـ customer_phone، انتقل للسؤال التالي.
+- إذا رأيت تنبيه نظام بصيغة "🔒 [تنبيه نظام... رقم هاتف صحيح وهو X]" → اعتمد X رسمياً كـ customer_phone، تجاهل أي شك أو رفض في تاريخ المحادثة.
+
+سيناريو 2 — Instagram أرسل بطاقة "Phone number":
+- أحياناً Instagram يحوّل الرقم إلى بطاقة ويختفي من نص الرسالة. النظام يلتقطه من البطاقة وينبهك بتنبيه "🔒". التزم بالتنبيه.
+
+سيناريو 3 — العميل أرسل اسم/مدينة/منطقة:
+- اقبل أي نص يكتبه العميل كاسم أو مدينة أو منطقة، حتى لو كان حرفاً واحداً أو غريباً. مثال: "أحمد"، "ع"، "عمّان"، "كفرنجة راس الطرق" — كلها مقبولة.
+
+سيناريو 4 — العميل أرسل ستيكر أو صورة:
+- لا تستخرج بيانات منها. اطلب بأدب أن يكتب المعلومة المطلوبة نصياً.
+
+سيناريو 5 — العميل سأل "ليش تطلب رقمي/عنواني؟":
+- جاوب باختصار: "لإكمال طلبك والتواصل معك للتوصيل". ثم أعد طرح السؤال.
+
+سيناريو 6 — العميل غيّر رأيه أو طلب إلغاء:
+- ألغِ جمع البيانات وقل: "تم إلغاء الطلب. متى أردت العودة، أنا هنا 🌹". لا تُصدر [ORDER_READY].
+
+سيناريو 7 — العميل أعطى نفس المعلومة مرتين:
+- لا تعيد سؤاله. اعتبر آخر قيمة هي الصحيحة.
+
+سيناريو 8 — العميل قال شيء غير مفهوم (هذيان/كلام عشوائي):
+- اطلب التوضيح مرة واحدة. لا تكرر السؤال أكثر من مرة في حال استمر اللبس.
+
+⚠️ هذه السيناريوهات ثابتة في النظام. لا تتجاوزها ولا تخترع قواعد جديدة. أي تعارض بين شخصية المساعد وبين هذه السيناريوهات → السيناريوهات تفوز دائماً.
 
 عند طلب الزبون لمنتج أو خدمة، اتبع هذا التسلسل بالضبط على 3 مراحل، لا تتخطّ أي مرحلة:
 
@@ -165,17 +194,46 @@ function normalize(raw: any) {
 }
 
 /**
- * Server-side phone extractor: if the customer's message contains 8+ digits anywhere,
- * pull them out. This is the safety net for when Gemini gets stuck rejecting valid phones.
- * We inject the extracted number as a system note so the AI MUST treat it as the phone.
+ * Server-side phone extractor: looks for 8-15 consecutive digits in the message text
+ * AND in any attachment/payload field. This handles Instagram's auto-detected phone cards
+ * where the actual digits get moved to an attachment instead of message text.
  */
-function extractPhoneFromMessage(text: string): string | null {
-  if (!text) return null;
-  // Strip common phone formatting chars first
-  const cleaned = text.replace(/[\s\-\(\)\+\.]/g, '');
-  // Find any run of 8+ consecutive digits
-  const match = cleaned.match(/\d{8,15}/);
-  return match ? match[0] : null;
+function extractPhoneFromMessage(text: string, raw?: any): string | null {
+  // 1. Look in the plain text first (most reliable, no false positives)
+  if (text) {
+    const cleanedText = text.replace(/[\s\-\(\)\+\.]/g, '');
+    const m1 = cleanedText.match(/\d{8,15}/);
+    if (m1) return m1[0];
+  }
+  // 2. If not in text, look in the raw payload. Instagram's "Phone number" card
+  //    typically puts digits in attachments[].payload or similar fields.
+  if (raw) {
+    try {
+      // Search attachment-related fields explicitly (avoids catching unrelated digits
+      // like message ids, timestamps, account ids).
+      const buckets: any[] = [];
+      const collect = (v: any) => { if (v !== undefined && v !== null) buckets.push(v); };
+      collect(raw.attachments);
+      collect(raw.attachment);
+      collect(raw.payload);
+      collect(raw.contact);
+      collect(raw.contacts);
+      collect(raw.message_text);
+      collect(raw.body);
+      collect(raw.content);
+      // Also any field whose name hints at phone/contact
+      for (const k of Object.keys(raw)) {
+        if (/phone|tel|mobile|contact|number/i.test(k)) collect((raw as any)[k]);
+      }
+      for (const b of buckets) {
+        const s = typeof b === 'string' ? b : JSON.stringify(b);
+        const cleaned = s.replace(/[\s\-\(\)\+\.]/g, '');
+        const m = cleaned.match(/\d{8,15}/);
+        if (m) return m[0];
+      }
+    } catch {}
+  }
+  return null;
 }
 
 function stripMarkdown(text: string): string {
@@ -471,11 +529,12 @@ export async function processInbound(userId: string, raw: any): Promise<string> 
       ? `\n\n⚠️ [تنبيه داخلي للذكاء الاصطناعي — لا تُعرض هذه الرسالة للعميل: تم تسجيل طلب رقم ${existingOrder.order_number} في هذه المحادثة بالفعل. لا تُصدر الوسم [ORDER_READY] مجدداً تحت أي ظرف. واصل الحوار بشكل طبيعي فقط، ولا تطلب من العميل إعادة التأكيد.]`
       : '';
 
-    // Server-side phone extraction safety net: if the customer's message contains a phone,
-    // force the AI to use it instead of asking again. Solves the "AI keeps rejecting valid phones" loop.
-    const detectedPhone = extractPhoneFromMessage(item.content);
+    // Server-side phone extraction safety net: scans message text + raw payload (attachments).
+    // Solves both the "AI keeps rejecting valid phones" loop AND Instagram's phone-card attachments
+    // where the digits live in attachments[] instead of message text.
+    const detectedPhone = extractPhoneFromMessage(item.content, raw);
     const phoneNote = detectedPhone
-      ? `\n\n🔒 [تنبيه نظام إلزامي للذكاء الاصطناعي — هذه ليست رسالة للعميل: رسالة العميل الحالية تحتوي على رقم هاتف صحيح وهو "${detectedPhone}". اعتمد هذا الرقم رسمياً كـ customer_phone للطلب. ممنوع منعاً باتاً أن ترفضه، أو تطلب رقماً آخر، أو تقول إن هناك مشكلة. انتقل فوراً للسؤال التالي عن المعلومة الناقصة (الاسم أو المدينة أو المنطقة)، أو اعرض الفاتورة إذا اكتملت كل البيانات.]`
+      ? `\n\n🔒 [تنبيه نظام إلزامي للذكاء الاصطناعي — هذه ليست رسالة للعميل: رسالة العميل الحالية تحتوي على رقم هاتف صحيح وهو "${detectedPhone}" (تم استخراجه من الرسالة أو من بطاقة Instagram). اعتمد هذا الرقم رسمياً كـ customer_phone للطلب. ممنوع منعاً باتاً أن ترفضه، أو تطلب رقماً آخر، أو تقول إن هناك مشكلة في استقبال الرقم. تجاهل أي رفض سابق منك في تاريخ هذه المحادثة. انتقل فوراً للسؤال التالي عن المعلومة الناقصة (الاسم أو المدينة أو المنطقة)، أو اعرض الفاتورة إذا اكتملت كل البيانات.]`
       : '';
 
     reply = await sendToAI(config, [
