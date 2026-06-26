@@ -24,14 +24,72 @@ const COMPLAINT_REPLY = 'تم إيصال مشكلتك للإدارة، سيتم 
 
 const PAUSE_HOURS_COMPLAINT = 2;
 
+// Immutable order-collection contract — always appended after the user's persona,
+// no matter what they put in store_config.system_prompt. This is what prevents the
+// AI from firing [ORDER_READY] before collecting all required customer info.
+const ORDER_CONTRACT = `
+
+### قواعد إلزامية لجمع وتسجيل الطلبات (لا تخالفها أبداً) ###
+
+تنبيهات عامة:
+- لا تستخدم رموز Markdown مثل ** أو __ أو # في ردودك. اكتب نصاً عادياً.
+- ردودك مختصرة (3 جمل كحد أقصى) وبنفس لغة/لهجة العميل.
+
+عند طلب الزبون لمنتج أو خدمة، اتبع هذا التسلسل بالضبط على 3 مراحل، لا تتخطّ أي مرحلة:
+
+🅰️ المرحلة A — جمع البيانات (اسأل عن المعلومة الناقصة فقط، سؤال واحد كل رسالة):
+يجب أن تحصل على كل هذه قبل أي شيء آخر:
+1) المنتجات والكميات
+2) اسم العميل (customer_name)
+3) رقم الهاتف (customer_phone) — أرقام فقط
+4) المدينة (customer_city)
+5) المنطقة/التفاصيل (customer_area)
+
+لو ناقص أي شيء، اسأل عنه بأدب ولا تفعل أي شيء آخر. لا تُسجّل أي طلب الآن. لا تُصدر الوسم [ORDER_READY] الآن.
+
+🅱️ المرحلة B — معاينة الفاتورة (بعد جمع كل شيء، وقبل التسجيل):
+ردّك التالي يجب أن يكون فاتورة منسّقة داخل الدردشة بهذا الشكل تقريباً:
+
+الفاتورة:
+- المنتج: {name} × {qty} = {subtotal}
+الإجمالي: {total}
+
+بياناتك:
+- الاسم: {customer_name}
+- الهاتف: {customer_phone}
+- العنوان: {customer_city} - {customer_area}
+
+هل أؤكد الطلب؟ ✅
+
+في هذه المرحلة لا تُصدر الوسم [ORDER_READY] بعد. انتظر تأكيد العميل النهائي.
+
+🅾️ المرحلة C — التسجيل النهائي:
+إذا ردّ العميل بإيجاب صريح ("نعم"، "تم"، "أكد"، "ok"، "yes"، "أكد الطلب")، عندها فقط:
+1) أصدر الوسم مرة واحدة فقط بهذا الشكل الحرفي في بداية الرد (سيُحذف الوسم تلقائياً من رسالة العميل):
+[ORDER_READY]{"customer_name":"...","customer_phone":"...","customer_city":"...","customer_area":"...","products":[{"name":"...","quantity":1,"price":0}],"total_amount":0}[/ORDER_READY]
+2) أتبعه بجملة قصيرة: "تم تسجيل طلبك بنجاح. سنتواصل معك للتأكيد قريباً 🌹"
+
+⚠️ لا تكرّر الوسم ولا تُصدره مرة ثانية في نفس المحادثة بعد التسجيل.
+⚠️ لا تخترع منتجات أو أسعار غير موجودة في قائمة المنتجات أدناه.
+⚠️ إذا قال العميل "لا" أو غيّر الطلب في المرحلة B، عُد للمرحلة A وعدّل البيانات.
+
+مثال مصغّر يوضّح الفرق:
+العميل: "بدي اطلب الخدمة"
+أنت: "أهلاً بك 🌹 طيب لو سمحت، ما اسمك الكريم؟"
+العميل: "أحمد"
+أنت: "تشرّفت أحمد. ما رقم هاتفك للتواصل والتوصيل؟"
+... وهكذا حتى تكتمل كل البيانات، ثم اعرض الفاتورة، ثم انتظر "نعم" قبل إصدار الوسم.
+`;
+
 async function buildSystemPrompt(userId: string): Promise<string> {
   const { data: store } = await supabase.from('store_config').select('store_name, system_prompt').eq('user_id', userId).single();
   let prompt = store?.system_prompt || `أنت موظف مبيعات ذكي ومتعاون لمتجر "${store?.store_name || 'AutoFlow'}".`;
   const { data: products } = await supabase.from('products').select('name, price, quantity').eq('user_id', userId).gt('quantity', 0);
   if (products?.length) {
-    prompt += '\n\n### المتوفر حالياً ###\n' + products.map(p => `- ${p.name}: ${p.price}، الكمية ${p.quantity}`).join('\n');
+    prompt += '\n\n### المتوفر حالياً (المصدر الوحيد للأسعار والكميات) ###\n' + products.map(p => `- ${p.name}: ${p.price}، الكمية ${p.quantity}`).join('\n');
   }
-  prompt += '\n\nقواعد الرد الإلزامية:\n1. لا تستخدم أي رموز تنسيق مثل * أو ** أو _ أو # أو - في ردودك. اكتب نصاً عادياً فقط.\n2. اكتب 3 جمل كحد أقصى بنفس لغة العميل.\n3. عندما يُؤكد العميل طلبه، ضع بيانات الطلب مباشرةً في بداية ردك بهذا الشكل الحرفي ثم أكمل رسالتك العادية:\n[ORDER_READY]{"customer_name":"...","customer_phone":"...","customer_city":"...","customer_area":"...","products":[{"name":"...","quantity":1,"price":0}],"total_amount":0}[/ORDER_READY]';
+  // Always append the immutable contract LAST, so it overrides anything the user wrote.
+  prompt += ORDER_CONTRACT;
   return prompt;
 }
 
@@ -84,6 +142,22 @@ async function maybeExtractAndSaveOrder(
 ): Promise<string> {
   const match = reply.match(/\[ORDER_READY\]([\s\S]*?)\[\/ORDER_READY\]/);
   if (!match) return reply;
+
+  // Defense in depth: even if the AI emits ORDER_READY multiple times in the same
+  // conversation, we only save one order per (conversation, 10-minute window).
+  // The tag is still stripped from the customer-visible reply.
+  try {
+    const cutoff = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    const { data: recentOrder } = await supabase.from('orders')
+      .select('id, order_number')
+      .eq('user_id', userId).eq('conversation_id', convId)
+      .gte('created_at', cutoff)
+      .limit(1).maybeSingle();
+    if (recentOrder) {
+      console.log(`[inbound] duplicate ORDER_READY suppressed (existing order ${recentOrder.order_number} for conv ${convId})`);
+      return reply.replace(/\[ORDER_READY\][\s\S]*?\[\/ORDER_READY\]/g, '').trim();
+    }
+  } catch (e: any) { console.error('[inbound dedup check]', e?.message || e); }
 
   try {
     const orderData = JSON.parse(match[1].trim());
@@ -292,8 +366,17 @@ export async function processInbound(userId: string, raw: any): Promise<string> 
       ? `\n\n[ملخص المحادثة السابقة مع هذا العميل:\n${conv!.context_summary}\n]`
       : '';
 
+    // Prevent the AI from re-emitting ORDER_READY if an order was already placed
+    // in this conversation (guards against the "4 duplicate orders" problem).
+    const { data: existingOrder } = await supabase.from('orders')
+      .select('order_number').eq('user_id', userId).eq('conversation_id', conv!.id)
+      .limit(1).maybeSingle();
+    const orderNote = existingOrder
+      ? `\n\n⚠️ [تنبيه داخلي للذكاء الاصطناعي — لا تُعرض هذه الرسالة للعميل: تم تسجيل طلب رقم ${existingOrder.order_number} في هذه المحادثة بالفعل. لا تُصدر الوسم [ORDER_READY] مجدداً تحت أي ظرف. واصل الحوار بشكل طبيعي فقط، ولا تطلب من العميل إعادة التأكيد.]`
+      : '';
+
     reply = await sendToAI(config, [
-      { role: 'system', content: system + summaryNote },
+      { role: 'system', content: system + summaryNote + orderNote },
       ...liveMsgs,
       { role: 'user', content: item.content },
     ]);

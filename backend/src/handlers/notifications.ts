@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { supabase } from '../supabase';
 import { Ctx } from '../rpc';
+import { emit } from '../events';
 
 /**
  * Notification kinds:
@@ -25,6 +26,8 @@ export async function createNotification(
     conversation_id: conversationId || null,
     meta: meta || null,
   });
+  // Push SSE notification so the browser plays a sound and updates the badge.
+  emit(userId, 'notification', { type, title });
   // Fire-and-forget telegram push.
   pushToTelegram(userId, type, title, body, conversationId).catch(() => {});
 }
@@ -188,6 +191,86 @@ export const notificationsHandlers = {
     } catch (e: any) {
       return { success: false, error: e?.response?.data?.description || e?.message || 'فشل الجلب', chats: [] };
     }
+  },
+
+  // ---- Admin: manage another user's telegram bot from the admin panel ----
+  'admin:tgListChatsFor': async ({ userId }: Ctx, { target_user_id }: any) => {
+    const adminP = await supabase.from('user_profiles').select('is_admin').eq('user_id', userId).single();
+    if (!adminP.data?.is_admin) throw new Error('Forbidden');
+    const { data } = await supabase.from('user_profiles').select('telegram_bot_token').eq('user_id', target_user_id).single();
+    const token = data?.telegram_bot_token;
+    if (!token) return { success: false, error: 'لم يتم حفظ توكن البوت', chats: [] };
+    try {
+      const res = await axios.get(`https://api.telegram.org/bot${token}/getUpdates`, {
+        params: {
+          allowed_updates: JSON.stringify(['message', 'channel_post', 'my_chat_member', 'chat_member']),
+          limit: 100,
+        },
+        timeout: 10000,
+      });
+      const updates = res.data?.result || [];
+      const chatsMap = new Map();
+      for (const u of updates) {
+        const chat = u.message?.chat || u.channel_post?.chat
+          || u.my_chat_member?.chat || u.chat_member?.chat
+          || u.edited_message?.chat || u.edited_channel_post?.chat;
+        if (chat && !chatsMap.has(String(chat.id))) {
+          chatsMap.set(String(chat.id), {
+            id: String(chat.id), type: chat.type,
+            title: chat.title || chat.username || [chat.first_name, chat.last_name].filter(Boolean).join(' ') || `Chat ${chat.id}`,
+            username: chat.username || null,
+          });
+        }
+      }
+      return { success: true, chats: Array.from(chatsMap.values()) };
+    } catch (e: any) {
+      return { success: false, error: e?.response?.data?.description || e?.message || 'فشل الجلب', chats: [] };
+    }
+  },
+
+  'admin:tgTestFor': async ({ userId }: Ctx, { target_user_id }: any) => {
+    const adminP = await supabase.from('user_profiles').select('is_admin').eq('user_id', userId).single();
+    if (!adminP.data?.is_admin) throw new Error('Forbidden');
+    const { data } = await supabase.from('user_profiles')
+      .select('telegram_bot_token, admin_telegram_chat_id, full_name, email').eq('user_id', target_user_id).single();
+    const token = data?.telegram_bot_token;
+    const chatId = data?.admin_telegram_chat_id;
+    if (!token) return { success: false, error: 'لم يتم حفظ توكن البوت' };
+    if (!chatId) return { success: false, error: 'لم يتم تحديد القناة' };
+    const text = `✅ *AutoFlow Chat — اختبار اتصال (من الإدارة)*\n\nهذه قناة الإشعارات لـ ${data?.full_name || data?.email || target_user_id.slice(0,8)}.\nالبوت جاهز لإرسال إشعارات الطلبات والشكاوى.`;
+    try {
+      await axios.post(`https://api.telegram.org/bot${token}/sendMessage`, {
+        chat_id: chatId, text, parse_mode: 'Markdown',
+      }, { timeout: 8000 });
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, error: e?.response?.data?.description || e?.message || 'فشل الإرسال' };
+    }
+  },
+
+  'admin:tgSaveTokenFor': async ({ userId }: Ctx, { target_user_id, token }: any) => {
+    const adminP = await supabase.from('user_profiles').select('is_admin').eq('user_id', userId).single();
+    if (!adminP.data?.is_admin) throw new Error('Forbidden');
+    const clean = String(token || '').trim();
+    if (!clean) {
+      await supabase.from('user_profiles').update({ telegram_bot_token: '' }).eq('user_id', target_user_id);
+      return { success: true };
+    }
+    try {
+      const res = await axios.get(`https://api.telegram.org/bot${clean}/getMe`, { timeout: 6000 });
+      if (!res.data?.ok) throw new Error('Invalid token');
+      await supabase.from('user_profiles').update({ telegram_bot_token: clean }).eq('user_id', target_user_id);
+      return { success: true, bot: res.data.result };
+    } catch (e: any) {
+      return { success: false, error: e?.response?.data?.description || e?.message || 'فشل التحقق' };
+    }
+  },
+
+  'admin:tgSaveChatFor': async ({ userId }: Ctx, { target_user_id, chat_id }: any) => {
+    const adminP = await supabase.from('user_profiles').select('is_admin').eq('user_id', userId).single();
+    if (!adminP.data?.is_admin) throw new Error('Forbidden');
+    await supabase.from('user_profiles').update({ admin_telegram_chat_id: String(chat_id || '') }).eq('user_id', target_user_id);
+    return { success: true };
   },
 
   'telegram:sendTest': async ({ userId }: Ctx) => {

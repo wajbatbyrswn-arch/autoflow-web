@@ -486,9 +486,14 @@ export default function Settings() {
             </div>
 
             <div className="card">
-              <div className="card-title">حالة الحسابات المربوطة</div>
+              <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6}}>
+                <div className="card-title" style={{margin:0}}>حالة الحسابات المربوطة</div>
+                <button className="btn btn-secondary btn-sm" onClick={loadNashir} disabled={nashirLoading} style={{fontSize:12}}>
+                  {nashirLoading ? '...' : '🔄 تحديث'}
+                </button>
+              </div>
               <p style={{fontSize:13,color:'var(--text-muted)',marginBottom:18}}>
-                سيظهر هنا تلقائياً أي حساب يربطه الفريق لك، أو تربطه بنفسك (تلغرام).
+                سيظهر هنا تلقائياً أي حساب يربطه الفريق لك، أو تربطه بنفسك (تلغرام). اضغط تحديث بعد أن يُخبرك الفريق بإتمام الربط.
               </p>
 
               <div className="settings-grid">

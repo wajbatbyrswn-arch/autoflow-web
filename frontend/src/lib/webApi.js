@@ -110,6 +110,15 @@ export function installWebApi() {
       getSettings: () => rpc('comments:getSettings'),
       saveSettings: (s) => rpc('comments:saveSettings', s),
       deleteComment: (id) => rpc('comments:deleteComment', { id }),
+      testAutomation: (a) => rpc('comments:testAutomation', a),
+    },
+
+    // Admin-side Telegram bot management (per user, from admin panel).
+    adminTg: {
+      saveToken: (target_user_id, token) => rpc('admin:tgSaveTokenFor', { target_user_id, token }),
+      listChats: (target_user_id) => rpc('admin:tgListChatsFor', { target_user_id }),
+      saveChat: (target_user_id, chat_id) => rpc('admin:tgSaveChatFor', { target_user_id, chat_id }),
+      test: (target_user_id) => rpc('admin:tgTestFor', { target_user_id }),
     },
 
     telegram: {

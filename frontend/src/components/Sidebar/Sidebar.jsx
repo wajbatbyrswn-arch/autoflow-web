@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { NavLink } from 'react-router-dom'
+import { play as playSound } from '../../lib/sounds'
 import { LayoutDashboard, MessageSquare, Bot, ReplyAll, MessageCircle, FileSpreadsheet, Receipt, LineChart, Bell, Settings, Database, History, Megaphone, CheckCircle, Sparkles, AlertOctagon } from 'lucide-react'
 import './Sidebar.css'
 import logoImg from '../../assets/logo.jpg'
@@ -56,6 +57,8 @@ export default function Sidebar({ isAdmin, profile = null }) {
     loadStoreInfo()
   }, [])
 
+  // Track previous counts to detect growth → ring the chime.
+  const prevRef = useRef(null)
   useEffect(() => {
     let cancelled = false
     async function loadCounts() {
@@ -66,11 +69,19 @@ export default function Sidebar({ isAdmin, profile = null }) {
         ])
         if (cancelled) return
         const openComplaints = (complaintsList || []).filter(c => !c.is_read).length
-        setCounts({ unread: unread?.count || 0, complaints: openComplaints })
+        const next = { unread: unread?.count || 0, complaints: openComplaints }
+        // Audible signal: skip first load (avoid initial chime), play on growth.
+        const prev = prevRef.current
+        if (prev) {
+          if (next.complaints > prev.complaints) playSound('complaint')
+          else if (next.unread > prev.unread)   playSound('notify')
+        }
+        prevRef.current = next
+        setCounts(next)
       } catch {}
     }
     loadCounts()
-    const iv = setInterval(loadCounts, 30000)
+    const iv = setInterval(loadCounts, 15000)
     return () => { cancelled = true; clearInterval(iv) }
   }, [])
 

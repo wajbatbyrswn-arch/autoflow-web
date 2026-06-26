@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, Sun, Moon, Calendar, LogOut, Sparkles } from 'lucide-react'
+import { Bell, BellOff, Sun, Moon, Calendar, LogOut, Sparkles } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
+import { isMuted, setMuted } from '../../lib/sounds'
 import './TitleBar.css'
 
 export default function TitleBar({ theme, toggleTheme, isActive = true }) {
   const logout = async () => { await supabase.auth.signOut(); location.reload() }
   const nav = useNavigate()
+  const [muted, setMutedLocal] = useState(() => isMuted())
+  function toggleMute() { const v = !muted; setMutedLocal(v); setMuted(v) }
 
   const [now, setNow] = useState(new Date())
   const [storeName, setStoreName] = useState('AutoFlow')
@@ -65,8 +68,11 @@ export default function TitleBar({ theme, toggleTheme, isActive = true }) {
             }
           </button>
 
-          <button className="action-btn">
+          <button className="action-btn" onClick={() => nav('/notifications')} title="الإشعارات">
             <Bell size={18} />
+          </button>
+          <button className="action-btn" onClick={toggleMute} title={muted ? 'تشغيل أصوات الإشعارات' : 'كتم أصوات الإشعارات'}>
+            {muted ? <BellOff size={18} /> : <Bell size={18} style={{ opacity: .5 }} />}
           </button>
         </div>
 

@@ -17,6 +17,9 @@ import Plans from './pages/Plans/Plans'
 import Notifications from './pages/Notifications/Notifications'
 import Complaints from './pages/Complaints/Complaints'
 import { SubscriptionProvider } from './lib/subscription'
+import { ConfirmProvider } from './components/ConfirmDialog/ConfirmDialog'
+import { on } from './lib/events'
+import { play } from './lib/sounds'
 import './styles/globals.css'
 
 function InactiveBanner({ status }) {
@@ -45,10 +48,19 @@ export default function App({ profile, onSubscriptionChange }) {
     localStorage.setItem('theme', theme)
   }, [theme])
 
+  // Play notification sounds when events arrive from the backend.
+  useEffect(() => {
+    const offNotif = on('notification', (data) => {
+      play(data?.type === 'complaint' ? 'complaint' : 'notify')
+    })
+    return () => { offNotif?.() }
+  }, [])
+
   const toggleTheme = () => setTheme(t => t === 'dark' ? 'light' : 'dark')
 
   return (
     <SubscriptionProvider profile={profile} onChange={onSubscriptionChange}>
+      <ConfirmProvider>
       <HashRouter>
         <div className="app-layout">
           <Sidebar isAdmin={isAdmin} profile={profile} />
@@ -81,6 +93,7 @@ export default function App({ profile, onSubscriptionChange }) {
           }} />
         </div>
       </HashRouter>
+      </ConfirmProvider>
     </SubscriptionProvider>
   )
 }

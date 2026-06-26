@@ -47,7 +47,7 @@ export const nashirHandlers = {
   // Returns the Nashir connection state + connected accounts grouped by platform.
   'nashir:status': async ({ userId }: Ctx) => {
     const { data } = await supabase.from('user_profiles')
-      .select('nashir_api_key, nashir_account_ids, is_admin').eq('user_id', userId).single();
+      .select('nashir_api_key, nashir_account_ids, nashir_linked_platforms, is_admin').eq('user_id', userId).single();
     const ownKey = (data?.nashir_api_key || '').trim();
     const key = ownKey || process.env.NASHIR_API_KEY || '';
     const assigned: string[] = Array.isArray(data?.nashir_account_ids) ? data!.nashir_account_ids.map(String) : [];
@@ -76,9 +76,22 @@ export const nashirHandlers = {
       }
     }
 
-    // FALLBACK: if Nashir API check returned nothing (no key, error, no admin assignment),
-    // derive connected platforms from real inbound traffic. If we received messages from
-    // a platform in the last 30 days, it's clearly connected — the API check is just for cosmetics.
+    // PRIMARY FALLBACK: admin-set linked platforms are the ground truth — they reflect
+    // exactly what the admin has wired up for this user, instantly (no need to wait for
+    // first traffic). Pre-populate any platform admin assigned that isn't already in result.
+    const adminPlatforms: string[] = Array.isArray(data?.nashir_linked_platforms) ? data!.nashir_linked_platforms : [];
+    for (const p of adminPlatforms) {
+      const key = String(p || '').toLowerCase();
+      if (!result.platforms[key]) continue;
+      if (result.platforms[key].length === 0) {
+        result.platforms[key].push({ pageId: 'admin', pageName: 'مربوط من قبل الفريق ✓', platform: key, _admin: true });
+        result.connectedCount++;
+      }
+    }
+
+    // SECONDARY FALLBACK: if still nothing showed, derive connected platforms from real
+    // inbound traffic. If we received messages from a platform in the last 30 days, it's
+    // clearly connected — the API check is just for cosmetics.
     if (result.connectedCount === 0) {
       const since = new Date(Date.now() - 30 * 86400000).toISOString();
       const { data: convs } = await supabase.from('conversations')

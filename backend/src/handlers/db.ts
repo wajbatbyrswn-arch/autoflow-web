@@ -183,7 +183,8 @@ export const dbHandlers = {
     // Merge with existing row so partial saves (e.g. only currency) don't erase other fields.
     const { data: existing } = await supabase.from('store_config').select('*').eq('user_id', userId).single();
     const FIELDS = ['store_name','store_description','language','work_hours','ai_personality',
-      'currency','contact_phone','system_prompt','store_logo','product_fields'];
+      'currency','contact_phone','system_prompt','store_logo','product_fields',
+      'invoice_address','invoice_social','invoice_brand_color'];
     // Empty string for these text fields is treated as "no change" — it almost
     // always comes from a stale local state, not a user explicitly clearing them.
     // (If a user really wants to clear, they pass a single space or a special token.)

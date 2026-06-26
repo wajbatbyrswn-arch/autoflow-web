@@ -19,6 +19,24 @@
   font-family: 'Cairo', sans-serif;
   direction: rtl;
 }
+/* Force every text element inside the paper to render dark on the white sheet,
+   beating the app's dark-theme inherited color on <strong>, <td>, <span> etc. */
+.invoice-paper, .invoice-paper * { color: #111 !important; }
+.invoice-paper .inv-store-name,
+.invoice-paper .inv-title,
+.invoice-paper .inv-section-title,
+.invoice-paper .inv-thanks { color: var(--inv-brand, #1B3A8C) !important; }
+.invoice-paper .inv-status { color: #2BB24C !important; }
+.invoice-paper .inv-store-meta,
+.invoice-paper .inv-store-desc,
+.invoice-paper .inv-date,
+.invoice-paper .inv-grid span,
+.invoice-paper .inv-footer,
+.invoice-paper .inv-poweredby { color: #555 !important; }
+.invoice-paper .inv-table thead th,
+.invoice-paper .inv-table thead th * { color: #fff !important; }
+.invoice-paper .inv-total-row.grand,
+.invoice-paper .inv-total-row.grand * { color: #fff !important; }
 
 .inv-head {
   display: flex; justify-content: space-between; align-items: flex-start;
@@ -94,6 +112,43 @@
 .inv-thanks { font-size: 14px; font-weight: 700; color: #1B3A8C; margin-bottom: 6px; }
 .inv-platform { margin-bottom: 4px; }
 .inv-poweredby { font-size: 10px; opacity: 0.6; margin-top: 8px; }
+
+/* ===== Customize step (dark theme modal) ===== */
+.invoice-customize {
+  background: var(--bg-card, #1a1d24);
+  border: 1px solid var(--border-color, #2a2e37);
+  border-radius: 18px;
+  padding: 22px 26px 18px;
+  color: var(--text, #fff);
+  font-family: 'Cairo', sans-serif;
+  direction: rtl;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.cust-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 14px; border-bottom: 1px solid var(--border-color, #2a2e37); }
+.cust-head h2 { margin: 0; font-size: 18px; font-weight: 800; }
+.cust-section { padding: 16px 0; border-bottom: 1px dashed var(--border-color, #2a2e37); }
+.cust-section:last-of-type { border-bottom: none; }
+.cust-section h3 { font-size: 13px; font-weight: 800; color: #6ee7b7; margin: 0 0 12px; }
+.cust-checks { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 16px; }
+@media (max-width: 540px) { .cust-checks { grid-template-columns: 1fr; } }
+.cust-check { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; padding: 8px 12px; background: var(--glass-bg, rgba(255,255,255,0.04)); border-radius: 10px; border: 1px solid var(--border-color, #2a2e37); }
+.cust-check input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
+.cust-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; font-size: 13px; }
+.cust-field span { font-weight: 700; opacity: .85; }
+.cust-field input, .cust-field textarea {
+  padding: 9px 12px; border-radius: 10px;
+  border: 1px solid var(--border-color, #2a2e37);
+  background: var(--bg-input, #0f1115); color: var(--text, #fff);
+  font-family: inherit; font-size: 13px;
+}
+.cust-field textarea { resize: vertical; min-height: 56px; line-height: 1.7; }
+.cust-3col { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+@media (max-width: 600px) { .cust-3col { grid-template-columns: 1fr; } }
+.cust-color .color-row { display: flex; align-items: center; gap: 10px; }
+.cust-color input[type="color"] { width: 50px; height: 38px; padding: 0; border-radius: 8px; cursor: pointer; background: transparent; }
+.cust-color input[type="text"] { flex: 1; font-family: monospace; }
+.cust-foot { display: flex; gap: 10px; justify-content: flex-end; padding-top: 16px; margin-top: 4px; border-top: 1px solid var(--border-color, #2a2e37); }
 
 /* ===== Print: hide everything except the invoice paper ===== */
 @media print {

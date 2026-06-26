@@ -19,14 +19,17 @@
 
 /* ===== Comments list ===== */
 .comments-list { display: flex; flex-direction: column; gap: 10px; }
-.comment-card { padding: 16px; background: var(--bg-card, #1a1d24); border: 1px solid var(--border-color, #2a2e37); border-radius: 12px; border-right-width: 4px; position: relative; }
+.comment-card { padding: 14px 16px; background: var(--bg-card, #1a1d24); border: 1px solid var(--border-color, #2a2e37); border-radius: 12px; border-right-width: 4px; display: flex; flex-direction: column; gap: 8px; }
 .comment-card.deleted { opacity: .45; }
-.cc-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.cc-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .cc-platform-ico { width: 22px; height: 22px; object-fit: contain; }
-.cc-time { margin-right: auto; font-size: 11px; opacity: .55; }
-.cc-body { margin: 0 0 8px; font-size: 14px; line-height: 1.7; }
-.cc-post { font-size: 11px; opacity: .55; font-family: monospace; }
-.cc-del-btn { position: absolute; top: 14px; left: 14px; background: transparent; border: 1px solid rgba(239,68,68,0.4); color: #ef4444; padding: 5px 10px; border-radius: 8px; font-size: 11px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; font-family: inherit; }
+/* timestamp NO longer pushes to the far left — it's just a normal chip in the flow */
+.cc-time { font-size: 11px; opacity: .55; padding: 2px 8px; background: var(--glass-bg, rgba(255,255,255,0.04)); border-radius: 6px; }
+.cc-body { margin: 0; font-size: 14px; line-height: 1.7; }
+.cc-post { font-size: 11px; opacity: .55; font-family: monospace; word-break: break-all; }
+/* Footer row holds the delete button, never overlaps the timestamp */
+.cc-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; padding-top: 8px; border-top: 1px dashed var(--border-color, #2a2e37); }
+.cc-del-btn { background: transparent; border: 1px solid rgba(239,68,68,0.4); color: #ef4444; padding: 6px 12px; border-radius: 8px; font-size: 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; font-family: inherit; font-weight: 600; }
 .cc-del-btn:hover { background: rgba(239,68,68,0.1); }
 
 /* ===== Tag chips ===== */

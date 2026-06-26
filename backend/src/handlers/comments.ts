@@ -181,4 +181,25 @@ export const commentsHandlers = {
     await supabase.from('comments_inbox').update({ deleted: true }).eq('id', id).eq('user_id', userId);
     return { success: true };
   },
+
+  /**
+   * Dry-run: given automation values, render what would happen if the first trigger
+   * keyword arrived as a comment on the configured post. Doesn't touch the platform API.
+   */
+  'comments:testAutomation': async ({ userId }: Ctx, a: any) => {
+    if (!a?.trigger_keywords?.length) return { success: false, error: 'لا يوجد كلمات مفتاحية' };
+    if (!a?.comment_reply) return { success: false, error: 'رد التعليق فارغ' };
+    if (!a?.dm_message) return { success: false, error: 'رسالة الخاص فارغة' };
+    const dmBody = a.dm_attachment_url
+      ? `${a.dm_message}\n\n${a.dm_attachment_url}`
+      : a.dm_message;
+    return {
+      success: true,
+      would_reply: true,
+      would_dm: true,
+      trigger_used: a.trigger_keywords[0],
+      comment_reply: a.comment_reply,
+      dm_message: dmBody,
+    };
+  },
 };

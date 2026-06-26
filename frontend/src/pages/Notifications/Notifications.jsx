@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { Bell, ShoppingCart, AlertTriangle, Info, Trash2, MessageCircle } from 'lucide-react'
+import { useConfirm } from '../../components/ConfirmDialog/ConfirmDialog'
 
 const TYPE_META = {
   order:     { label: 'طلب جديد', color: '#10b981', Icon: ShoppingCart },
@@ -11,6 +12,7 @@ const TYPE_META = {
 
 export default function Notifications() {
   const nav = useNavigate()
+  const confirm = useConfirm()
   const [items, setItems] = useState([])
   const [filter, setFilter] = useState('all')
   const [loading, setLoading] = useState(true)
@@ -31,7 +33,8 @@ export default function Notifications() {
     setItems(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n))
   }
   async function del(id) {
-    if (!confirm('حذف الإشعار؟')) return
+    const ok = await confirm({ title: 'حذف الإشعار', message: 'هل تريد حذف هذا الإشعار نهائياً؟', confirmText: 'حذف', dangerous: true, rememberKey: 'notif_delete' })
+    if (!ok) return
     await window.api?.notifications?.delete?.(id)
     setItems(prev => prev.filter(n => n.id !== id))
   }

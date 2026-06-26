@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
-import { MessageCircle, Trash2, Edit3, Plus, Power, Sparkles, AlertOctagon, X } from 'lucide-react'
+import { MessageCircle, Trash2, Edit3, Plus, Power, Sparkles, AlertOctagon, X, FlaskConical } from 'lucide-react'
 import facebookIcon from '../../assets/icons/facebook.png'
 import instagramIcon from '../../assets/icons/instagram.png'
+import { useConfirm } from '../../components/ConfirmDialog/ConfirmDialog'
+import { parsePostUrl } from '../../lib/postUrlParser'
 import './CommentAutomation.css'
 
 const TABS = [
@@ -30,6 +32,7 @@ function emptyAutomation() {
 }
 
 export default function CommentAutomation() {
+  const confirm = useConfirm()
   const [tab, setTab] = useState('inbox')
   const [comments, setComments] = useState([])
   const [automations, setAutomations] = useState([])
@@ -37,6 +40,10 @@ export default function CommentAutomation() {
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(null)
   const [keywordInput, setKeywordInput] = useState('')
+  const [postUrlInput, setPostUrlInput] = useState('')
+  const [urlParseStatus, setUrlParseStatus] = useState(null) // 'ok' | 'bad' | null
+  const [testResult, setTestResult] = useState(null)
+  const [testing, setTesting] = useState(false)
 
   async function loadAll() {
     setLoading(true)
@@ -54,7 +61,14 @@ export default function CommentAutomation() {
   useEffect(() => { loadAll() }, [])
 
   async function deleteComment(id) {
-    if (!confirm('إخفاء/حذف هذا التعليق؟')) return
+    const ok = await confirm({
+      title: 'حذف التعليق',
+      message: 'سيتم إخفاء التعليق من القائمة. هل تريد المتابعة؟',
+      confirmText: 'نعم، احذف',
+      dangerous: true,
+      rememberKey: 'comment_delete',
+    })
+    if (!ok) return
     await window.api?.comments?.deleteComment?.(id)
     setComments(prev => prev.map(c => c.id === id ? { ...c, deleted: true } : c))
     toast.success('تم الحذف')
@@ -81,10 +95,37 @@ export default function CommentAutomation() {
   }
 
   async function deleteAutomation(id) {
-    if (!confirm('حذف هذه الاتمتة؟')) return
+    const ok = await confirm({
+      title: 'حذف الاتمتة',
+      message: 'سيتم حذف اتمتة المنشور نهائياً. لا يمكن التراجع.',
+      confirmText: 'نعم، احذف',
+      dangerous: true,
+      rememberKey: 'automation_delete',
+    })
+    if (!ok) return
     await window.api?.comments?.deleteAutomation?.(id)
     setAutomations(prev => prev.filter(a => a.id !== id))
     toast.success('تم الحذف')
+  }
+
+  function applyPostUrl() {
+    const parsed = parsePostUrl(postUrlInput)
+    if (!parsed) { setUrlParseStatus('bad'); toast.error('لم نستطع قراءة الرابط — تأكد أنه رابط منشور Facebook أو Instagram'); return }
+    setEditing(p => ({ ...p, post_id: parsed.post_id, post_url: parsed.post_url, platform: parsed.platform }))
+    setUrlParseStatus('ok')
+    toast.success(`تم التعرف: ${parsed.platform === 'facebook' ? 'فيسبوك' : 'إنستغرام'} — ID: ${parsed.post_id}`)
+  }
+
+  async function runTest() {
+    if (!editing?.trigger_keywords?.length) { toast.error('أضف كلمة مفتاحية أولاً'); return }
+    if (!editing?.comment_reply || !editing?.dm_message) { toast.error('املأ رد التعليق ورسالة الخاص أولاً'); return }
+    setTesting(true)
+    try {
+      const res = await window.api?.comments?.testAutomation?.(editing)
+      if (res?.success) setTestResult(res)
+      else toast.error(res?.error || 'فشل الاختبار')
+    } catch (e) { toast.error(e.message) }
+    setTesting(false)
   }
 
   async function toggleAutomation(a) {
@@ -136,15 +177,17 @@ export default function CommentAutomation() {
                       {c.ai_replied && <span className="tag tag-green">✓ تم الرد</span>}
                       {c.automation_triggered && <span className="tag tag-blue"><Sparkles size={11} /> اتمتة</span>}
                       {c.deleted && <span className="tag tag-grey">محذوف</span>}
-                      <span className="cc-time">{new Date(c.created_at).toLocaleString('ar-EG')}</span>
                     </div>
                     <p className="cc-body">{c.content}</p>
                     {c.post_id && <div className="cc-post">المنشور: {c.post_id.slice(0, 30)}{c.post_id.length > 30 ? '...' : ''}</div>}
-                    {!c.deleted && (
-                      <button className="cc-del-btn" onClick={() => deleteComment(c.id)}>
-                        <Trash2 size={13} /> إخفاء/حذف
-                      </button>
-                    )}
+                    <div className="cc-foot">
+                      <span className="cc-time">{new Date(c.created_at).toLocaleString('ar-EG')}</span>
+                      {!c.deleted && (
+                        <button className="cc-del-btn" onClick={() => deleteComment(c.id)}>
+                          <Trash2 size={13} /> إخفاء/حذف
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )
               })}
@@ -167,7 +210,7 @@ export default function CommentAutomation() {
             </div>
           </div>
 
-          <button className="btn btn-primary ca-add-btn" onClick={() => setEditing(emptyAutomation())}>
+          <button className="btn btn-primary ca-add-btn" onClick={() => { setEditing(emptyAutomation()); setPostUrlInput(''); setUrlParseStatus(null); setTestResult(null); setKeywordInput('') }}>
             <Plus size={16} /> إضافة اتمتة جديدة
           </button>
 
@@ -196,7 +239,7 @@ export default function CommentAutomation() {
                     <span style={{ opacity: .6, fontSize: 12 }}>تم تشغيلها {a.triggered_count || 0} مرة</span>
                     <div style={{ display: 'flex', gap: 6 }}>
                       <button className="btn btn-secondary btn-sm" onClick={() => toggleAutomation(a)}><Power size={13} /></button>
-                      <button className="btn btn-secondary btn-sm" onClick={() => { setEditing(a); setKeywordInput('') }}><Edit3 size={13} /></button>
+                      <button className="btn btn-secondary btn-sm" onClick={() => { setEditing(a); setKeywordInput(''); setPostUrlInput(a.post_url || ''); setUrlParseStatus(a.post_id ? 'ok' : null); setTestResult(null) }}><Edit3 size={13} /></button>
                       <button className="btn btn-danger btn-sm" onClick={() => deleteAutomation(a.id)}><Trash2 size={13} /></button>
                     </div>
                   </div>
@@ -254,10 +297,26 @@ export default function CommentAutomation() {
             </div>
 
             <div className="input-group">
-              <label className="input-label">معرف المنشور (Post ID)</label>
-              <input className="input" dir="ltr" placeholder="123456789_987654321" value={editing.post_id}
-                     onChange={e => setEditing(p => ({ ...p, post_id: e.target.value }))} />
-              <div className="input-hint">تجده في رابط المنشور أو لوحة ناشر.</div>
+              <label className="input-label">رابط المنشور</label>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <input className="input" dir="ltr" style={{ flex: 1 }}
+                  placeholder="https://www.facebook.com/.../posts/...  أو  https://instagram.com/p/..."
+                  value={postUrlInput}
+                  onChange={e => { setPostUrlInput(e.target.value); setUrlParseStatus(null) }}
+                  onBlur={() => postUrlInput && applyPostUrl()} />
+                <button type="button" className="btn btn-primary" onClick={applyPostUrl}>قراءة</button>
+              </div>
+              {urlParseStatus === 'ok' && editing.post_id && (
+                <div className="input-hint" style={{ color: '#34d399' }}>
+                  ✓ {editing.platform === 'facebook' ? 'فيسبوك' : 'إنستغرام'} — معرف المنشور: <code>{editing.post_id}</code>
+                </div>
+              )}
+              {urlParseStatus === 'bad' && (
+                <div className="input-hint" style={{ color: '#fca5a5' }}>لم نتعرف على الرابط. تأكد أنه رابط منشور FB أو IG.</div>
+              )}
+              {urlParseStatus !== 'ok' && (
+                <div className="input-hint">انسخ رابط المنشور من فيسبوك أو إنستغرام والصقه هنا.</div>
+              )}
             </div>
 
             <div className="input-group">
@@ -304,8 +363,21 @@ export default function CommentAutomation() {
               <div className="input-hint">رابط ملف PDF، صورة، أو موقع — يُضاف لرسالة الخاص.</div>
             </div>
 
+            {testResult && (
+              <div style={{ background:'rgba(43,178,76,0.08)', border:'1px solid rgba(43,178,76,0.35)', borderRadius:12, padding:'14px 16px', marginTop:10 }}>
+                <div style={{ fontSize:13, fontWeight:800, color:'#6ee7b7', marginBottom:8 }}>✓ نتيجة الاختبار — سيُرسَل ما يلي عندما يعلّق زبون بـ "{testResult.trigger_used}":</div>
+                <div style={{ fontSize:13, marginBottom:6 }}><strong>↩ رد التعليق العام:</strong></div>
+                <div style={{ background:'var(--glass-bg,rgba(255,255,255,0.05))', padding:'8px 12px', borderRadius:8, fontSize:13, marginBottom:10 }}>{testResult.comment_reply}</div>
+                <div style={{ fontSize:13, marginBottom:6 }}><strong>📩 رسالة الخاص (DM):</strong></div>
+                <pre style={{ background:'var(--glass-bg,rgba(255,255,255,0.05))', padding:'8px 12px', borderRadius:8, fontSize:13, whiteSpace:'pre-wrap', fontFamily:'inherit', margin:0 }}>{testResult.dm_message}</pre>
+              </div>
+            )}
+
             <div className="ca-modal-actions">
               <button className="btn btn-secondary" onClick={() => setEditing(null)}>إلغاء</button>
+              <button className="btn btn-secondary" onClick={runTest} disabled={testing}>
+                <FlaskConical size={14} /> {testing ? 'جارٍ الاختبار...' : 'اختبار'}
+              </button>
               <button className="btn btn-primary" onClick={saveAutomation}>حفظ الاتمتة</button>
             </div>
           </div>

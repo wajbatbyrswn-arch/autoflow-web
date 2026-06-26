@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { supabase } from '../supabase';
 import { Ctx } from '../rpc';
 import { nashir } from './nashir';
+import { createNotification } from './notifications';
 
 /** Ensure a profile + store_config row exists for the user (first login bootstrap). */
 async function ensureProfile(userId: string) {
@@ -105,9 +106,40 @@ export const accountHandlers = {
     if (subscription_status !== undefined) updates.subscription_status = subscription_status;
     if (is_admin !== undefined) updates.is_admin = is_admin;
     if (nashir_account_ids !== undefined) {
-      updates.nashir_account_ids = Array.isArray(nashir_account_ids)
+      const ids = Array.isArray(nashir_account_ids)
         ? nashir_account_ids.map((x: any) => String(x).trim()).filter(Boolean)
         : [];
+      updates.nashir_account_ids = ids;
+      // Also persist which platforms admin linked — so user dashboard reflects
+      // status immediately without waiting for first traffic.
+      let linkedPageNames: string[] = [];
+      try {
+        const key = process.env.NASHIR_API_KEY || '';
+        if (key && ids.length) {
+          const accs = await nashir.accounts(key);
+          const platforms = new Set<string>();
+          for (const a of (accs || [])) {
+            if (ids.includes(String(a.pageId))) {
+              platforms.add(String(a.platform || '').toLowerCase());
+              if (a.pageName) linkedPageNames.push(a.pageName);
+            }
+          }
+          updates.nashir_linked_platforms = Array.from(platforms);
+        } else if (!ids.length) {
+          updates.nashir_linked_platforms = [];
+        }
+      } catch (e: any) { console.error('[admin:updateUser linked_platforms]', e?.message || e); }
+
+      // Notify the user that their accounts are now connected.
+      if (ids.length) {
+        const namesStr = linkedPageNames.length ? linkedPageNames.join('، ') : `${ids.length} صفحة`;
+        createNotification(
+          target_user_id, 'system',
+          '✅ تم ربط حساباتك',
+          `قام فريق AutoFlow بربط حساباتك على المنصة. الصفحات المربوطة: ${namesStr}. يمكنك الآن مراجعة الإعدادات > المنصات لرؤية الحالة.`,
+          null, {}
+        ).catch(() => {});
+      }
     }
     if (nashir_business_id !== undefined) updates.nashir_business_id = String(nashir_business_id || '');
     if (telegram_bot_token !== undefined) updates.telegram_bot_token = String(telegram_bot_token || '');

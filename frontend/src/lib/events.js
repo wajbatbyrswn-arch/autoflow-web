@@ -33,6 +33,11 @@ export function on(channel, cb) {
   return () => listeners.get(channel)?.delete(cb)
 }
 
+export function once(channel, cb) {
+  const unsub = on(channel, (data) => { unsub(); cb(data) })
+  return unsub
+}
+
 export function removeAll(channel) {
   listeners.delete(channel)
 }
