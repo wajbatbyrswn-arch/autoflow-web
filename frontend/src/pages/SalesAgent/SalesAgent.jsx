@@ -478,10 +478,19 @@ ${productLines || 'لا توجد منتجات'}
           )}
 
           <div className="input-group">
-            <label className="input-label">System Prompt (قابل للتعديل اليدوي)</label>
+            <label className="input-label">System Prompt (شخصية المساعد فقط — قواعد جمع الطلبات يضيفها النظام تلقائياً)</label>
             <textarea className="textarea" style={{minHeight:350,fontFamily:'monospace',fontSize:13,direction:'rtl'}} value={store.system_prompt||''} onChange={e => setStore(s=>({...s,system_prompt:e.target.value}))} />
+            <div className="input-hint" style={{color:'#fbbf24'}}>ℹ️ هذا النص لتعريف شخصية المساعد ونبرته فقط. قواعد جمع الطلبات (الاسم/الهاتف/العنوان/[ORDER_READY]) محفوظة بالنظام ولا تحتاج كتابتها هنا. إذا كان عندك نص قديم يحتوي قواعد جمع الطلبات، احذفها لتجنب التضارب.</div>
           </div>
-          <button className="btn btn-primary" onClick={saveStore}>حفظ الـ System Prompt</button>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+            <button className="btn btn-primary" onClick={saveStore}>حفظ الـ System Prompt</button>
+            <button className="btn btn-secondary" onClick={() => {
+              if (window.confirm('سيتم مسح الـ System Prompt الحالي والعودة للنص الافتراضي. متابعة؟')) {
+                setStore(s => ({ ...s, system_prompt: '' }))
+                toast.success('تم المسح. اضغط حفظ لتثبيت التغيير.')
+              }
+            }}>🔄 إعادة تعيين للافتراضي</button>
+          </div>
         </div>
       )}
 

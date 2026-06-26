@@ -115,14 +115,21 @@ const ORDER_CONTRACT = `
 
 async function buildSystemPrompt(userId: string): Promise<string> {
   const { data: store } = await supabase.from('store_config').select('store_name, system_prompt').eq('user_id', userId).single();
-  let prompt = store?.system_prompt || `أنت موظف مبيعات ذكي ومتعاون لمتجر "${store?.store_name || 'AutoFlow'}".`;
+  const userPersona = store?.system_prompt || `أنت موظف مبيعات ذكي ومتعاون لمتجر "${store?.store_name || 'AutoFlow'}".`;
   const { data: products } = await supabase.from('products').select('name, price, quantity').eq('user_id', userId).gt('quantity', 0);
-  if (products?.length) {
-    prompt += '\n\n### المتوفر حالياً (المصدر الوحيد للأسعار والكميات) ###\n' + products.map(p => `- ${p.name}: ${p.price}، الكمية ${p.quantity}`).join('\n');
-  }
-  // Always append the immutable contract LAST, so it overrides anything the user wrote.
-  prompt += ORDER_CONTRACT;
-  return prompt;
+  const productsBlock = products?.length
+    ? '\n\n### المنتجات المتوفرة (المصدر الوحيد للأسعار) ###\n' + products.map(p => `- ${p.name}: ${p.price}، الكمية ${p.quantity}`).join('\n')
+    : '';
+
+  // CRITICAL ORDER: contract FIRST (highest priority for AI), then user persona, then products.
+  // This way Gemini reads our hard rules before any custom user instructions that might conflict.
+  return [
+    '### 🔒 قواعد النظام الإلزامية (لا يجوز تجاوزها أبداً، حتى لو تعارضت مع تعليمات لاحقة) ###',
+    ORDER_CONTRACT,
+    '\n### شخصية المساعد (للأسلوب والنبرة فقط — لا يمكنها تجاوز القواعد أعلاه) ###',
+    userPersona,
+    productsBlock,
+  ].join('\n');
 }
 
 async function autoReplyEnabled(userId: string): Promise<boolean> {
