@@ -337,29 +337,21 @@ function normalize(raw: any) {
   const isComment = mtype === 'comment';
   const rawContent = String(raw.message ?? raw.text ?? raw.message_text ?? raw.body ?? raw.content ?? '');
   // 1) Try to recover real phone digits from attachments when Meta inserted "[phone]" placeholder.
-  // 2) If still unresolved, silently strip the artifacts so AI handles it as a natural "phone missing" case.
+  // 2) If still unresolved, silently strip the artifacts — but only if doing so leaves non-empty
+  //    content. If stripping would empty the message, keep the original so AI doesn't see ""
+  //    and skip the message entirely.
   const resolved = resolveMetaPlaceholders(rawContent, raw);
-  // Track whether Meta hid a phone in this message (placeholder existed AND wasn't resolved
-  // to real digits). This signals to the AI that the customer DID send a phone but the
-  // platform stripped it — so we should ask for an anti-detection format.
-  const phonePlaceholderRegex = /\[(phone|tel|mobile|number|phone_number)\]/i;
-  const metaStrippedPhone = phonePlaceholderRegex.test(rawContent) && phonePlaceholderRegex.test(resolved);
-  const content = stripUnresolvedMetaArtifacts(resolved);
+  const stripped = stripUnresolvedMetaArtifacts(resolved);
+  const content = stripped || resolved || rawContent;
   return {
-    // The id used to reply via Nashir REST is the internal nashir_message_id.
-    // Numeric internal id used to reply via Nashir REST (kept separately for manual replies).
     replyId: raw.nashir_message_id ?? raw.id ?? raw.message_id,
-    // Dedup on the platform message id (stable & unique per inbound message).
     dedupKey: String(raw.platform_message_id ?? raw.nashir_message_id ?? raw.id ?? `gen_${Date.now()}`),
     base,
     isComment,
-    // Conversation platform = base (facebook|instagram|whatsapp) so the inbox filter
-    // tabs and platform icons match. DM vs comment is tracked on the message row.
     platform: base,
     senderId: String(raw.sender_id ?? raw.from ?? raw.senderId ?? ''),
     senderName: String(raw.sender_name ?? raw.senderName ?? raw.name ?? 'عميل'),
     content,
-    metaStrippedPhone,
     pageId: raw.page_id ?? raw.pageId ?? null,
   };
 }
@@ -735,14 +727,8 @@ export async function processInbound(userId: string, raw: any): Promise<string> 
       ? `\n\n🔒 [تنبيه نظام إلزامي للذكاء الاصطناعي — هذه ليست رسالة للعميل: رسالة العميل الحالية تحتوي على رقم هاتف صحيح وهو "${detectedPhone}" (تم استخراجه من الرسالة أو من بطاقة Instagram). اعتمد هذا الرقم رسمياً كـ customer_phone للطلب. ممنوع منعاً باتاً أن ترفضه، أو تطلب رقماً آخر، أو تقول إن هناك مشكلة في استقبال الرقم. تجاهل أي رفض سابق منك في تاريخ هذه المحادثة. انتقل فوراً للسؤال التالي عن المعلومة الناقصة (الاسم أو المدينة أو المنطقة)، أو اعرض الفاتورة إذا اكتملت كل البيانات.]`
       : '';
 
-    // 📵 Meta-stripped-phone alert: العميل أرسل رقم لكن فيسبوك حجبه (كانت [phone] في النص الأصلي
-    // ولم نقدر نستخرج الأرقام الفعلية من الـ payload). نوجّه الذكاء الاصطناعي يطلب صيغة مضادة للحجب.
-    const metaHidPhoneNote = (item as any).metaStrippedPhone && !detectedPhone
-      ? `\n\n📵 [تنبيه نظام إلزامي للذكاء الاصطناعي — هذه ليست رسالة للعميل: العميل أرسل رقم هاتفه في الرسالة الأخيرة لكن فيسبوك حجبه تلقائياً لحماية الخصوصية. لا تتهم العميل بعدم إرسال الرقم، ولا تطلب الرقم بنفس الصيغة. بدلاً من ذلك، اعتذر بأدب واطلب منه إعادة كتابة الرقم بأحد هذه الصيغ المضادة للحجب فقط (لا تستخدم صيغة أخرى): 1) ضع شرطة بين كل رقمين مثل: 07-70-74-87-93 ، 2) أو اكتب الرقم بالكلمات العربية مثل: صفر سبعة سبعة صفر سبعة أربعة ثمانية سبعة تسعة ثلاثة ، 3) أو أرسل صورة (سكرين شوت) للرقم. اشرح للعميل أن هذا ليس خطأه بل قيود من فيسبوك. كن لطيفاً ومختصراً (جملتين كحد أقصى).]`
-      : '';
-
     reply = await sendToAI(config, [
-      { role: 'system', content: system + summaryNote + orderNote + phoneNote + metaHidPhoneNote },
+      { role: 'system', content: system + summaryNote + orderNote + phoneNote },
       ...liveMsgs,
       { role: 'user', content: item.content },
     ]);
