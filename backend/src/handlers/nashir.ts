@@ -25,29 +25,23 @@ export const nashir = {
   replyComment: (key: string, id: number | string, message: string, pageId?: string) =>
     client(key).post(`/comments/${id}/reply`, { message, ...(pageId ? { pageId } : {}) }).then(r => r.data),
   markRead: (key: string, id: number | string) => client(key).patch(`/messages/${id}/read`).then(r => r.data),
-  // Fetch full message details by ID. Used to enrich webhook payloads that only
-  // include the redacted text (e.g. "[phone]") — the single-message endpoint often
-  // returns attachments / contact / payload that the list endpoint omits.
+  // Fetch full message details by Nashir id. The single-message endpoint does NOT exist on
+  // Nashir (returns HTML 404). The LIST endpoint /messages does return everything we need:
+  // the original (un-redacted) `message` field AND a `safety_flags.stripped_phones` array
+  // when Meta/Nashir redacted phones in the webhook. We pull a small recent window and
+  // match by id locally.
   getMessage: async (key: string, id: number | string): Promise<any | null> => {
-    const attempts = [
-      `/messages/${id}`,
-      `/messages/${id}?include=attachments`,
-      `/messages/${id}?expand=attachments,payload`,
-    ];
-    for (const url of attempts) {
-      try {
-        const res = await client(key).get(url);
-        const data = res.data?.data ?? res.data;
-        if (data && typeof data === 'object') {
-          console.log(`[nashir getMessage] OK via ${url}`);
-          return data;
-        }
-      } catch (e: any) {
-        const status = e?.response?.status;
-        if (status !== 404 && status !== 405) {
-          console.error(`[nashir getMessage] ${url} failed:`, status);
-        }
+    try {
+      const res = await client(key).get('/messages', { params: { limit: 50 } });
+      const messages = res.data?.data || [];
+      const match = messages.find((m: any) => String(m.id) === String(id));
+      if (match) {
+        console.log(`[nashir getMessage] OK via list endpoint, id=${id}`);
+        return match;
       }
+      console.warn(`[nashir getMessage] id=${id} not in last 50 messages`);
+    } catch (e: any) {
+      console.error('[nashir getMessage] list failed:', e?.response?.status, e?.message);
     }
     return null;
   },

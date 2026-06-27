@@ -194,6 +194,13 @@ async function autoReplyEnabled(userId: string): Promise<boolean> {
  * Skips known platform-id fields so we never confuse a message_id for a phone.
  */
 function recoverPhoneFromAttachments(raw: any): string | null {
+  // Primary source: Nashir's safety_flags.stripped_phones array (when we got it via REST enrichment)
+  const flags = raw?._safety_flags ?? raw?.safety_flags;
+  const stripped = flags?.stripped_phones;
+  if (Array.isArray(stripped) && stripped.length > 0) {
+    const first = String(stripped[0]).replace(/[\s\-\(\)\+\.]/g, '');
+    if (/^\d{9,13}$/.test(first)) return first;
+  }
   const SKIP_KEYS = /^(id|_id|mid|message_id|nashir_message_id|platform_message_id|sender_id|recipient_id|account_id|page_id|business_id|team_id|conversation_id|timestamp|created_at|updated_at)$/i;
   const sources = [raw?.attachments, raw?.attachment, raw?.payload, raw?.entities, raw?.contact, raw?.contacts];
   for (const src of sources) {
@@ -513,12 +520,12 @@ async function maybeCompressHistory(convId: number, userId: string, config: any)
 
 /** Process one inbound item: store it, get AI reply, and SEND it back via Nashir REST. Returns the reply text. */
 export async function processInbound(userId: string, raw: any): Promise<string> {
-  // If the webhook payload has Meta's "[phone]" privacy placeholder, ask Nashir's REST
-  // for the FULL message — that endpoint often includes attachments/payload that the
-  // webhook strips out. We merge any new fields onto raw so normalize() can recover
-  // the real digits.
+  // Nashir webhook redacts phones/emails to "[phone]"/"[email]" for safety. The REST
+  // list endpoint returns the ORIGINAL un-redacted message AND a safety_flags object
+  // with arrays of what was stripped. When we see a redaction in the webhook, fetch
+  // the full record and substitute the real values.
   const rawTextPeek = String(raw.message ?? raw.text ?? raw.body ?? '');
-  if (/\[(phone|tel|mobile|number|phone_number)\]/i.test(rawTextPeek)) {
+  if (/\[(phone|tel|mobile|number|phone_number|email|address)\]/i.test(rawTextPeek)) {
     const msgId = raw.nashir_message_id ?? raw.id ?? raw.message_id;
     if (msgId) {
       try {
@@ -526,8 +533,16 @@ export async function processInbound(userId: string, raw: any): Promise<string> 
         if (key) {
           const full = await nashir.getMessage(key, msgId);
           if (full && typeof full === 'object') {
-            raw = { ...raw, ...full, attachments: (full as any).attachments ?? raw.attachments };
-            console.log(`[inbound] enriched payload via Nashir getMessage(${msgId})`);
+            // Use the un-redacted message text directly when available — this is the
+            // exact text Nashir stored from Meta (e.g. "0770748793" instead of "[phone]").
+            const realMsg = (full as any).message;
+            if (typeof realMsg === 'string' && realMsg.length > 0) {
+              raw = { ...raw, message: realMsg, _safety_flags: (full as any).safety_flags };
+              console.log(`[inbound] un-redacted message via Nashir REST: ${realMsg.slice(0, 100)}`);
+            } else {
+              raw = { ...raw, ...full };
+              console.log(`[inbound] enriched payload via Nashir getMessage(${msgId})`);
+            }
           }
         }
       } catch (e: any) {
