@@ -22,6 +22,7 @@ const TABS = [
   { id: 0, label: 'المنصات', icon: globeIcon },
   { id: 1, label: 'الملف الشخصي', icon: profileIcon },
   { id: 2, label: 'تنشيط الحساب', icon: saveIcon },
+  { id: 3, label: 'إدارة بوت تليجرام', icon: bellIcon },
 ]
 
 // Platform cards for the Nashir-based connection grid.
@@ -624,9 +625,8 @@ export default function Settings() {
           </div>
         )}
 
-        {/* Tabs 3 (Notifications) and 4 (System) removed — Telegram is admin-managed,
-            system info isn't needed in the web app. */}
-        {false && tab === 3 && (
+        {/* ── Tab 3: Telegram bot management ── */}
+        {tab === 3 && (
           <div className="animate-fade">
             <div className="card" style={{marginBottom:20, background:'linear-gradient(135deg, rgba(37,99,235,0.06), rgba(43,178,76,0.04))', border:'1px solid rgba(43,178,76,0.3)'}}>
               <div style={{display:'flex', alignItems:'center', gap:12, marginBottom:8}}>
@@ -735,54 +735,6 @@ export default function Settings() {
               </div>
             </div>
 
-            {/* ===== Legacy email/notification settings ===== */}
-            <div className="card">
-            <div className="card-title">إعدادات الإشعارات وتنبيهات الإدارة</div>
-            <div className="input-group" style={{marginBottom:20}}>
-              <label className="input-label">طريقة الإرسال المفضلة</label>
-              <select className="input" value={notifMethod} onChange={e=>setNotifMethod(e.target.value)}>
-                <option value="telegram">بوت تليجرام فقط</option>
-                <option value="email">إيميل (Gmail) فقط</option>
-                <option value="both">إرسال عبر تليجرام والإيميل معاً</option>
-              </select>
-            </div>
-            <div className="settings-grid" style={{marginBottom:20}}>
-              {(notifMethod === 'telegram' || notifMethod === 'both') && (
-                <div className="card" style={{background:'var(--glass-bg)',border:'1px solid var(--border-color)',boxShadow:'none'}}>
-                  <h3 style={{fontSize:14,marginBottom:15}}>إعدادات تليجرام</h3>
-                  <div className="input-group">
-                    <label className="input-label">Token بوت الإشعارات (اختياري)</label>
-                    <input className="input" value={notifTgToken} onChange={e=>setNotifTgToken(e.target.value)} placeholder="123456:ABC-DEF..." />
-                    <div className="input-hint">اتركه فارغاً لاستخدام البوت الرئيسي</div>
-                  </div>
-                  <div className="input-group">
-                    <label className="input-label">معرف حساب المدير (Chat ID)</label>
-                    <input className="input" value={adminChatId} onChange={e=>setAdminChatId(e.target.value)} placeholder="123456789" />
-                  </div>
-                </div>
-              )}
-              {(notifMethod === 'email' || notifMethod === 'both') && (
-                <div className="card" style={{background:'var(--glass-bg)',border:'1px solid var(--border-color)',boxShadow:'none'}}>
-                  <h3 style={{fontSize:14,marginBottom:15}}>إعدادات إيميل (Gmail)</h3>
-                  <div className="input-group">
-                    <label className="input-label">إيميل المرسل</label>
-                    <input className="input" type="email" value={notifEmailUser} onChange={e=>setNotifEmailUser(e.target.value)} placeholder="example@gmail.com" />
-                  </div>
-                  <div className="input-group">
-                    <label className="input-label">كلمة مرور التطبيق (App Password)</label>
-                    <input className="input" type="password" value={notifEmailPass} onChange={e=>setNotifEmailPass(e.target.value)} placeholder="xxxx xxxx xxxx xxxx" />
-                  </div>
-                  <div className="input-group">
-                    <label className="input-label">إيميل المستلم (الإدارة)</label>
-                    <input className="input" type="email" value={notifEmailTo} onChange={e=>setNotifEmailTo(e.target.value)} placeholder="manager@company.com" />
-                  </div>
-                </div>
-              )}
-            </div>
-            <button className="btn btn-primary" onClick={saveNotifSettings} disabled={isSavingNotif} style={{width:'100%'}}>
-              <img src={saveIcon} className="btn-img-icon" /> {isSavingNotif ? 'جارٍ الحفظ...' : 'حفظ إعدادات الإشعارات'}
-            </button>
-          </div>
           </div>
         )}
 

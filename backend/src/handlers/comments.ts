@@ -2,6 +2,7 @@ import { supabase } from '../supabase';
 import { Ctx } from '../rpc';
 import { nashir, nashirKey } from './nashir';
 import { resolveConfig, sendToAI } from './ai';
+import { createNotification } from './notifications';
 
 /**
  * Comment automation + AI replies.
@@ -75,21 +76,45 @@ export async function processInboundComment(userId: string, raw: any) {
     return;
   }
 
-  // Matched automation → public reply + private DM
+  // Matched automation → public reply + (best-effort) DM
   if (matched && key) {
+    // 1) Public reply
     try {
       await nashir.replyComment(key, commentId, matched.comment_reply);
-    } catch {}
-    // Try Facebook Private Reply via Nashir (works within 7 days of comment on Meta).
+    } catch (e: any) {
+      console.error('[comment automation] public reply failed:', e?.response?.status, e?.message);
+    }
+    // 2) Try to send DM via Nashir's private-reply / DM endpoints. Nashir's free tier
+    //    blocks /messages with "WhatsApp is a paid feature", and /comments/:id/private-reply
+    //    is 404, so this almost always fails. We try anyway in case the user upgrades.
     if (matched.dm_message) {
+      const dmBody = matched.dm_attachment_url
+        ? `${matched.dm_message}\n\n${matched.dm_attachment_url}`
+        : matched.dm_message;
+      let dmSent = false;
       try {
-        const dmBody = matched.dm_attachment_url
-          ? `${matched.dm_message}\n\n${matched.dm_attachment_url}`
-          : matched.dm_message;
         await nashir.privateReplyToComment(key, commentId, dmBody);
-        console.log('[comment automation] private reply sent to commenter');
+        console.log('[comment automation] DM sent via private reply');
+        dmSent = true;
       } catch (e: any) {
-        console.error('[comment automation] private reply failed:', e?.response?.status, JSON.stringify(e?.response?.data || e?.message).slice(0, 200));
+        console.warn('[comment automation] DM via private reply failed:', e?.response?.status, JSON.stringify(e?.response?.data || e?.message).slice(0, 200));
+      }
+      // 3) Fallback: if DM couldn't be sent, post the content as a SECOND public reply
+      //    so the commenter still receives the info/link/file they asked for.
+      if (!dmSent) {
+        try {
+          await nashir.replyComment(key, commentId, dmBody);
+          console.log('[comment automation] DM fallback: posted as public reply');
+          // Notify the user once per automation so they know to upgrade Nashir for true DMs.
+          createNotification(
+            userId, 'system',
+            'ℹ️ تم نشر رد التعليق كرد عام',
+            `تعليق #${commentId} تم الرد عليه برسالتك (الكلمة المفتاحية: ${(matched.trigger_keywords || []).join(', ')}). لإرسال الرد كرسالة خاصة (DM) بدلاً من رد عام، قم بترقية خطة Nashir.`,
+            null, { automation_id: matched.id, comment_id: commentId }
+          ).catch(() => {});
+        } catch (e: any) {
+          console.error('[comment automation] DM fallback (public reply) failed:', e?.response?.status, e?.message);
+        }
       }
     }
     await supabase.from('comments_inbox').update({ ai_replied: true }).eq('comment_id', commentId);
