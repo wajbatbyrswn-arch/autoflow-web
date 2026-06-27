@@ -50,6 +50,7 @@ export default function SalesAgent() {
   const [genLoading, setGenLoading] = useState(false)
 
   const [loaded, setLoaded] = useState(false)
+  const [storeLocked, setStoreLocked] = useState(false)
   useEffect(() => { loadAll() }, [])
 
   async function loadAll() {
@@ -62,6 +63,8 @@ export default function SalesAgent() {
     if (cfg?.product_fields && cfg.product_fields.enabled) setFieldConfig(cfg.product_fields)
     setProducts(prods)
     setLoaded(true)
+    // Lock the store form by default when there's saved data (user clicks "Edit" to unlock)
+    if (cfg?.store_name) setStoreLocked(true)
   }
 
   async function saveStore() {
@@ -70,6 +73,7 @@ export default function SalesAgent() {
       return
     }
     await window.api?.db.saveStoreConfig(store)
+    setStoreLocked(true)
     toast.success('تم حفظ إعدادات المتجر ✓')
   }
 
@@ -278,46 +282,60 @@ ${productLines || 'لا توجد منتجات'}
       {/* Tab 0: Store Settings */}
       {tab === 0 && (
         <div className="card animate-fade">
-          <div className="card-title">معلومات المتجر</div>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+            <div className="card-title" style={{margin:0}}>معلومات المتجر</div>
+            {storeLocked && (
+              <button className="btn btn-secondary btn-sm" onClick={() => setStoreLocked(false)}>
+                ✏️ تعديل
+              </button>
+            )}
+          </div>
           <div className="grid-2">
             <div className="input-group">
               <label className="input-label">اسم المتجر</label>
-              <input className="input" value={store.store_name||''} onChange={e => setStore(s=>({...s,store_name:e.target.value}))} placeholder="مثال: متجر الأزياء الراقية" />
+              <input className="input" disabled={storeLocked} value={store.store_name||''} onChange={e => setStore(s=>({...s,store_name:e.target.value}))} placeholder="مثال: متجر الأزياء الراقية" />
             </div>
             <div className="input-group">
               <label className="input-label">رقم التواصل</label>
-              <input className="input" value={store.contact_phone||''} onChange={e => setStore(s=>({...s,contact_phone:e.target.value}))} placeholder="+962..." />
+              <input className="input" disabled={storeLocked} value={store.contact_phone||''} onChange={e => setStore(s=>({...s,contact_phone:e.target.value}))} placeholder="+962..." />
             </div>
           </div>
           <div className="input-group">
             <label className="input-label">وصف المتجر</label>
-            <textarea className="textarea" value={store.store_description||''} onChange={e => setStore(s=>({...s,store_description:e.target.value}))} placeholder="ماذا يبيع متجرك؟ ما هي خدماتك؟" />
+            <textarea className="textarea" disabled={storeLocked} value={store.store_description||''} onChange={e => setStore(s=>({...s,store_description:e.target.value}))} placeholder="ماذا يبيع متجرك؟ ما هي خدماتك؟" />
           </div>
           <div className="grid-3">
             <div className="input-group">
               <label className="input-label">اللغة الافتراضية</label>
-              <select className="select" value={store.language||'ar'} onChange={e => setStore(s=>({...s,language:e.target.value}))}>
+              <select className="select" disabled={storeLocked} value={store.language||'ar'} onChange={e => setStore(s=>({...s,language:e.target.value}))}>
                 {LANGUAGES.map(l => <option key={l.v} value={l.v}>{l.l}</option>)}
               </select>
             </div>
             <div className="input-group">
               <label className="input-label">شخصية الـ AI</label>
-              <select className="select" value={store.ai_personality||'friendly'} onChange={e => setStore(s=>({...s,ai_personality:e.target.value}))}>
+              <select className="select" disabled={storeLocked} value={store.ai_personality||'friendly'} onChange={e => setStore(s=>({...s,ai_personality:e.target.value}))}>
                 {PERSONALITIES.map(p => <option key={p.v} value={p.v}>{p.l}</option>)}
               </select>
             </div>
             <div className="input-group">
               <label className="input-label">العملة</label>
-              <select className="select" value={store.currency||'JOD'} onChange={e => setStore(s=>({...s,currency:e.target.value}))}>
+              <select className="select" disabled={storeLocked} value={store.currency||'JOD'} onChange={e => setStore(s=>({...s,currency:e.target.value}))}>
                 {CURRENCIES.map(c => <option key={c.v} value={c.v}>{c.l}</option>)}
               </select>
             </div>
           </div>
           <div className="input-group">
             <label className="input-label">ساعات العمل</label>
-            <input className="input" value={store.work_hours||''} onChange={e => setStore(s=>({...s,work_hours:e.target.value}))} placeholder="مثال: 9 صباحاً - 10 مساءً" />
+            <input className="input" disabled={storeLocked} value={store.work_hours||''} onChange={e => setStore(s=>({...s,work_hours:e.target.value}))} placeholder="مثال: 9 صباحاً - 10 مساءً" />
           </div>
-          <button className="btn btn-primary" onClick={saveStore}>حفظ الإعدادات</button>
+          {!storeLocked && (
+            <button className="btn btn-primary" onClick={saveStore}>حفظ الإعدادات</button>
+          )}
+          {storeLocked && (
+            <div style={{padding:'10px 14px',background:'rgba(16,185,129,0.08)',border:'1px solid rgba(16,185,129,0.3)',borderRadius:8,fontSize:13,color:'#34d399'}}>
+              ✓ تم حفظ معلومات المتجر. اضغط "تعديل" لإجراء تغييرات.
+            </div>
+          )}
         </div>
       )}
 

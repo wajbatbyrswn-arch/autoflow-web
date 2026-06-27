@@ -22,8 +22,6 @@ const TABS = [
   { id: 0, label: 'المنصات', icon: globeIcon },
   { id: 1, label: 'الملف الشخصي', icon: profileIcon },
   { id: 2, label: 'تنشيط الحساب', icon: saveIcon },
-  { id: 3, label: 'الإشعارات', icon: bellIcon },
-  { id: 4, label: 'النظام', icon: monitorIcon },
 ]
 
 // Platform cards for the Nashir-based connection grid.
@@ -626,10 +624,10 @@ export default function Settings() {
           </div>
         )}
 
-        {/* ── Tab 3: Notifications + Telegram bot ── */}
-        {tab === 3 && (
+        {/* Tabs 3 (Notifications) and 4 (System) removed — Telegram is admin-managed,
+            system info isn't needed in the web app. */}
+        {false && tab === 3 && (
           <div className="animate-fade">
-            {/* ===== Telegram bot integration ===== */}
             <div className="card" style={{marginBottom:20, background:'linear-gradient(135deg, rgba(37,99,235,0.06), rgba(43,178,76,0.04))', border:'1px solid rgba(43,178,76,0.3)'}}>
               <div style={{display:'flex', alignItems:'center', gap:12, marginBottom:8}}>
                 <div style={{width:42, height:42, borderRadius:10, background:'#229ED9', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:20}}>✈</div>
@@ -788,16 +786,7 @@ export default function Settings() {
           </div>
         )}
 
-        {/* ── Tab 4: System ── */}
-        {tab === 4 && (
-          <div className="card animate-fade">
-            <div className="card-title">النظام</div>
-            <div className="system-info">
-              <div className="sys-row"><span>الإصدار</span><span>AutoFlow v1.0.0</span></div>
-              <div className="sys-row"><span>قاعدة البيانات</span><span>SQLite (محلي)</span></div>
-            </div>
-          </div>
-        )}
+        {/* Tab 4 (System info) removed — not useful in the web app. */}
 
       </div>
     </div>
