@@ -668,13 +668,17 @@ export async function processInbound(userId: string, raw: any): Promise<string> 
       ? `\n\n[ملخص المحادثة السابقة مع هذا العميل:\n${conv!.context_summary}\n]`
       : '';
 
-    // Prevent the AI from re-emitting ORDER_READY if an order was already placed
-    // in this conversation (guards against the "4 duplicate orders" problem).
+    // Prevent the AI from re-emitting ORDER_READY for the SAME order within a short window
+    // (guards against the "4 duplicate orders" problem). Only consider orders placed in the
+    // last 10 minutes — older orders in the same conversation are legitimate prior orders
+    // from returning customers and must NOT block new orders.
+    const recentCutoff = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     const { data: existingOrder } = await supabase.from('orders')
       .select('order_number').eq('user_id', userId).eq('conversation_id', conv!.id)
+      .gte('created_at', recentCutoff)
       .limit(1).maybeSingle();
     const orderNote = existingOrder
-      ? `\n\n⚠️ [تنبيه داخلي للذكاء الاصطناعي — لا تُعرض هذه الرسالة للعميل: تم تسجيل طلب رقم ${existingOrder.order_number} في هذه المحادثة بالفعل. لا تُصدر الوسم [ORDER_READY] مجدداً تحت أي ظرف. واصل الحوار بشكل طبيعي فقط، ولا تطلب من العميل إعادة التأكيد.]`
+      ? `\n\n⚠️ [تنبيه داخلي للذكاء الاصطناعي — لا تُعرض هذه الرسالة للعميل: تم تسجيل طلب رقم ${existingOrder.order_number} في هذه المحادثة قبل دقائق. لا تُصدر الوسم [ORDER_READY] مجدداً للطلب نفسه. واصل الحوار بشكل طبيعي. إذا طلب العميل منتجاً جديداً (طلب آخر)، تعامل معه كطلب مستقل وأصدر [ORDER_READY] جديد له.]`
       : '';
 
     // Server-side phone extraction safety net: scans message text + raw payload (attachments).
