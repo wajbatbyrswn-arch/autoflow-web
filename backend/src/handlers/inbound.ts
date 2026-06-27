@@ -721,7 +721,9 @@ export async function processInbound(userId: string, raw: any): Promise<string> 
 
     // Trigger background compression once history grows large (fire-and-forget, don't block reply)
     maybeCompressHistory(conv!.id, userId, config).catch(() => {});
-  } catch (e: any) { console.error('[inbound AI]', e?.message || e); }
+  } catch (e: any) {
+    console.error('[inbound AI ERROR]', e?.response?.status, JSON.stringify(e?.response?.data || e?.message).slice(0, 500), 'stack:', e?.stack?.slice(0, 300));
+  }
 
   if (!exists) {
     await supabase.from('messages').insert({

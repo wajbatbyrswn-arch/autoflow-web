@@ -65,10 +65,27 @@ export async function sendToAI(config: AIConfig, messages: Array<{ role: string;
 
   if (['openai', 'groq', 'mistral', 'openrouter'].includes(provider)) {
     const url = normalizeBaseUrl(baseUrl || getBaseUrl(provider));
-    const res = await axios.post(`${url}/chat/completions`, {
-      model, messages, temperature: 0.7, max_tokens: 1024,
-    }, { headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, timeout: 60000 });
-    return res.data.choices?.[0]?.message?.content || '';
+    const body: any = { model, messages, temperature: 0.7, max_tokens: 4096 };
+    // Gemini 2.5 family on OpenRouter uses "thinking tokens" by default — they consume
+    // the max_tokens budget before producing visible content, often returning an empty
+    // string. Disable reasoning so all tokens go to the actual reply.
+    if (provider === 'openrouter' && /gemini-2\.5/i.test(String(model || ''))) {
+      body.reasoning = { enabled: false };
+    }
+    try {
+      const res = await axios.post(`${url}/chat/completions`, body, {
+        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        timeout: 60000,
+      });
+      const content = res.data.choices?.[0]?.message?.content || '';
+      if (!content) {
+        console.warn(`[sendToAI ${provider}] empty content, finish_reason=${res.data.choices?.[0]?.finish_reason}, usage=`, JSON.stringify(res.data.usage));
+      }
+      return content;
+    } catch (e: any) {
+      console.error(`[sendToAI ${provider}] error:`, e?.response?.status, JSON.stringify(e?.response?.data || e?.message).slice(0, 500));
+      throw e;
+    }
   }
 
   if (provider === 'anthropic') {
