@@ -73,7 +73,7 @@ export default function App({ profile, onSubscriptionChange }) {
                 <Route path="/dashboard" element={<Dashboard />} />
                 {isAdmin && <Route path="/ai-config" element={<AIConfig />} />}
                 <Route path="/sales-agent" element={<SalesAgent />} />
-                {isAdmin && <Route path="/comments" element={<CommentAutomation />} />}
+                <Route path="/comments" element={<CommentAutomation isAdmin={isAdmin} />} />
                 <Route path="/conversations" element={<Conversations />} />
                 <Route path="/orders" element={<Orders />} />
                 <Route path="/reports" element={<Reports />} />

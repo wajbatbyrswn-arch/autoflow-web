@@ -7,9 +7,9 @@ import { useConfirm } from '../../components/ConfirmDialog/ConfirmDialog'
 import { parsePostUrl } from '../../lib/postUrlParser'
 import './CommentAutomation.css'
 
-const TABS = [
+const TABS_ALL = [
   { id: 'inbox',      label: 'صندوق التعليقات' },
-  { id: 'automation', label: 'اتمتة التعليقات' },
+  { id: 'automation', label: 'اتمتة التعليقات', adminOnly: true },
   { id: 'settings',   label: 'الإعدادات' },
 ]
 
@@ -31,8 +31,9 @@ function emptyAutomation() {
   }
 }
 
-export default function CommentAutomation() {
+export default function CommentAutomation({ isAdmin = false }) {
   const confirm = useConfirm()
+  const TABS = TABS_ALL.filter(t => !t.adminOnly || isAdmin)
   const [tab, setTab] = useState('inbox')
   const [comments, setComments] = useState([])
   const [automations, setAutomations] = useState([])

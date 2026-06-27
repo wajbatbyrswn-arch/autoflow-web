@@ -24,6 +24,7 @@ const NAV_MAIN = [
 
 const NAV_TOOLS = [
   { to: '/sales-agent', icon: agentIcon, label: 'الرد الذكي على الزبائن', isImage: true },
+  { to: '/comments', icon: commentsIcon, label: 'التعليقات', isImage: true },
   { to: '/complaints', icon: AlertOctagon, label: 'الشكاوى', isImage: false, badgeKey: 'complaints' },
   { to: '/orders', icon: ordersIcon, label: 'الفواتير', isImage: true },
   { to: '/reports', icon: reportsIcon, label: 'التقارير', isImage: true },
@@ -142,10 +143,6 @@ export default function Sidebar({ isAdmin, profile = null }) {
               <NavLink to="/ai-config" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
                 <img src={configIcon} alt="AI" className="nav-img-icon" />
                 <span className="nav-label">الذكاء الاصطناعي</span>
-              </NavLink>
-              <NavLink to="/comments" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-                <img src={commentsIcon} alt="comments" className="nav-img-icon" />
-                <span className="nav-label">أتمتة التعليقات</span>
               </NavLink>
             </nav>
           </div>
