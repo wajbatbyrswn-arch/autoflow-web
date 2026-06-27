@@ -429,3 +429,125 @@ body.landing-mode,
 .lp-footer-links { display: flex; gap: 18px; }
 .lp-footer-links a { color: var(--text-2); font-size: 13px; text-decoration: none; }
 .lp-footer-links a:hover { color: var(--text); }
+
+/* ════════════════════════════════════════════════════════════════════════
+   📱 MOBILE OVERHAUL — proper compact layout for phones
+   ════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+  /* Container: tighter side padding */
+  .lp-container { padding: 0 16px; }
+
+  /* Header: shrink, tabs scroll horizontally instead of wrapping */
+  .lp-header-inner { padding: 8px 16px; min-height: 56px; gap: 8px; flex-wrap: nowrap; }
+  .lp-brand-text { font-size: 14px; }
+  .lp-brand-logo { width: 34px; height: 34px; }
+  .lp-tabs {
+    order: 99; width: 100%;
+    flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start;
+    -webkit-overflow-scrolling: touch; scrollbar-width: none;
+    padding: 4px; border-radius: 12px; gap: 2px;
+  }
+  .lp-tabs::-webkit-scrollbar { display: none; }
+  .lp-tab { padding: 7px 12px; font-size: 12px; white-space: nowrap; flex-shrink: 0; }
+  .lp-btn-sm-mobile, .lp-header-inner .lp-btn { padding: 8px 14px; font-size: 13px; }
+
+  /* HERO: drastically tighter (was 930px tall) */
+  .hero { padding: 24px 0 28px; }
+  .hero-grid { gap: 24px; }
+  .hero-badge { font-size: 11px; padding: 5px 12px; }
+  .hero-title { font-size: 28px !important; line-height: 1.2; margin: 14px 0 12px; letter-spacing: -0.5px; }
+  .hero-sub { font-size: 14px; line-height: 1.7; margin-bottom: 20px; }
+  .hero-cta { gap: 8px; margin-bottom: 14px; }
+  .hero-cta .lp-btn { flex: 1; min-width: 0; padding: 12px 16px; font-size: 13px; }
+  .hero-trust { gap: 14px; font-size: 12px; }
+  .hero-logo-wrap { width: 220px; }
+  .hero-logo-img { padding: 14px; border-radius: 22px; }
+
+  /* PLATFORMS strip: tighter */
+  .platforms-strip { padding: 24px 0 8px; }
+  .platforms-label { font-size: 11px; letter-spacing: 1.4px; margin-bottom: 14px; }
+  .platforms-row { gap: 8px; }
+  .plat-pill { padding: 8px 14px; font-size: 13px; }
+  .plat-ico { width: 24px; height: 24px; font-size: 11px; }
+
+  /* STATS: smaller text, tighter padding */
+  .stats-strip { padding: 22px 0; margin-top: 28px; }
+  .stats-grid { gap: 16px; }
+  .stat-n { font-size: 28px; }
+  .stat-l { font-size: 11px; }
+
+  /* All section paddings tighter */
+  .problems, .features, .how, .use-cases, .pricing, .compare, .testimonials, .about, .contact-section, .faq { padding: 36px 0; }
+  .contact-cta { padding: 30px 0 50px; }
+
+  /* Section typography */
+  .section-eyebrow { font-size: 11px; padding: 4px 12px; margin-bottom: 10px; }
+  .section-title { font-size: 22px !important; margin-bottom: 10px; }
+  .section-sub { font-size: 14px; line-height: 1.75; margin-bottom: 24px; }
+
+  /* Cards everywhere: tighter padding */
+  .problem-card, .feature-card, .step, .usecase-card, .value-card, .testi-card { padding: 18px; border-radius: 14px; }
+  .problem-card h3, .feature-t, .step h3, .usecase-card h3, .value-card h3 { font-size: 15px; }
+  .problem-card p, .feature-d, .step p, .usecase-card p, .value-card p { font-size: 13px; }
+  .feature-ico { width: 42px; height: 42px; font-size: 22px; border-radius: 10px; margin-bottom: 12px; }
+  .step-n { width: 38px; height: 38px; font-size: 16px; }
+  .usecase-emoji { font-size: 32px; }
+  .value-ico { font-size: 32px; }
+
+  /* PRICING card */
+  .pricing { padding: 40px 0; }
+  .price-card { padding: 28px 22px; border-radius: 20px; }
+  .price-num { font-size: 48px; }
+  .price-cur { font-size: 16px; }
+  .price-list li { font-size: 13px; }
+
+  /* COMPARE table */
+  .ct-cell { padding: 12px 14px; font-size: 13px; }
+
+  /* TESTIMONIALS */
+  .testi-card { padding: 22px; }
+  .testi-text { font-size: 14px; line-height: 1.8; margin: 14px 0 16px; }
+  .testi-quote { font-size: 60px; top: 6px; right: 14px; }
+  .testi-avatar { width: 38px; height: 38px; font-size: 13px; }
+
+  /* CONTACT cards */
+  .contact-card { padding: 22px; gap: 10px; }
+  .contact-ico { width: 50px; height: 50px; border-radius: 12px; }
+  .contact-card h3 { font-size: 17px; }
+  .contact-detail { font-size: 12px; padding: 5px 10px; }
+
+  /* FAQ */
+  .faq-item { padding: 14px 16px; border-radius: 12px; }
+  .faq-item summary { font-size: 14px; }
+  .faq-item p { font-size: 13px; line-height: 1.75; }
+
+  /* CTA box */
+  .cta-box { padding: 32px 18px; border-radius: 22px; }
+  .cta-box h2 { font-size: 24px !important; margin-bottom: 10px; }
+  .cta-box p { font-size: 14px; margin-bottom: 20px; }
+  .cta-actions { flex-wrap: wrap; }
+  .cta-actions .lp-btn { flex: 1; min-width: 140px; }
+  .social { padding: 8px 14px; font-size: 12px; }
+
+  /* Buttons sizing */
+  .lp-btn { padding: 10px 18px; font-size: 13px; }
+  .lp-btn-lg { padding: 12px 22px; font-size: 14px; }
+
+  /* Footer */
+  .lp-footer { padding: 22px 0; }
+  .lp-footer-inner { justify-content: center; text-align: center; gap: 12px; }
+  .lp-footer-text { font-size: 12px; }
+  .lp-footer-links { gap: 14px; }
+  .lp-footer-links a { font-size: 12px; }
+}
+
+/* Extra-small phones (iPhone SE, etc.) */
+@media (max-width: 380px) {
+  .lp-container { padding: 0 12px; }
+  .hero-title { font-size: 24px !important; }
+  .hero-logo-wrap { width: 180px; }
+  .hero-cta { flex-direction: column; }
+  .hero-cta .lp-btn { width: 100%; }
+  .stat-n { font-size: 24px; }
+  .section-title { font-size: 20px !important; }
+}
