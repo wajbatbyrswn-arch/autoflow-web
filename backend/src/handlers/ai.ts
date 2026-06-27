@@ -65,14 +65,13 @@ export async function sendToAI(config: AIConfig, messages: Array<{ role: string;
 
   if (['openai', 'groq', 'mistral', 'openrouter'].includes(provider)) {
     const url = normalizeBaseUrl(baseUrl || getBaseUrl(provider));
-    const body: any = { model, messages, temperature: 0.7, max_tokens: 4096 };
-    // Gemini 2.5 family on OpenRouter uses "thinking tokens" by default — they consume
-    // the max_tokens budget before producing visible content, often returning an empty
-    // string. Disable reasoning so all tokens go to the actual reply.
-    if (provider === 'openrouter' && /gemini-2\.5/i.test(String(model || ''))) {
-      body.reasoning = { enabled: false };
-    }
-    try {
+    const callOnce = async (maxTokens: number): Promise<string> => {
+      const body: any = { model, messages, temperature: 0.7, max_tokens: maxTokens };
+      // Gemini 2.5 on OpenRouter uses "thinking tokens" by default — disable so all tokens
+      // go to the actual reply.
+      if (provider === 'openrouter' && /gemini-2\.5/i.test(String(model || ''))) {
+        body.reasoning = { enabled: false };
+      }
       const res = await axios.post(`${url}/chat/completions`, body, {
         headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
         timeout: 60000,
@@ -82,8 +81,24 @@ export async function sendToAI(config: AIConfig, messages: Array<{ role: string;
         console.warn(`[sendToAI ${provider}] empty content, finish_reason=${res.data.choices?.[0]?.finish_reason}, usage=`, JSON.stringify(res.data.usage));
       }
       return content;
+    };
+    try {
+      return await callOnce(4096);
     } catch (e: any) {
-      console.error(`[sendToAI ${provider}] error:`, e?.response?.status, JSON.stringify(e?.response?.data || e?.message).slice(0, 500));
+      const status = e?.response?.status;
+      const errMsg = e?.response?.data?.error?.message || '';
+      // OpenRouter low-credit auto-retry: parse "can only afford N" from the 402 message
+      // and retry once with that budget. Keeps replies flowing when the account is low.
+      if (status === 402 && /can only afford\s+(\d+)/i.test(errMsg)) {
+        const affordable = parseInt(RegExp.$1, 10);
+        const safeTokens = Math.max(50, affordable - 20);
+        console.warn(`[sendToAI ${provider}] low credit — retrying with max_tokens=${safeTokens} (had asked 4096)`);
+        try { return await callOnce(safeTokens); } catch (e2: any) {
+          console.error(`[sendToAI ${provider}] retry failed:`, e2?.response?.status, JSON.stringify(e2?.response?.data || e2?.message).slice(0, 500));
+          throw e2;
+        }
+      }
+      console.error(`[sendToAI ${provider}] error:`, status, JSON.stringify(e?.response?.data || e?.message).slice(0, 500));
       throw e;
     }
   }
