@@ -1,26 +1,36 @@
 import { HashRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import Sidebar from './components/Sidebar/Sidebar'
 import TitleBar from './components/TitleBar/TitleBar'
+// Dashboard is the landing route, keep it eager so first paint is instant
 import Dashboard from './pages/Dashboard/Dashboard'
-import AIConfig from './pages/AIConfig/AIConfig'
-import SalesAgent from './pages/SalesAgent/SalesAgent'
-import CommentAutomation from './pages/CommentAutomation/CommentAutomation'
-import Conversations from './pages/Conversations/Conversations'
-import Orders from './pages/Orders/Orders'
-import Reports from './pages/Reports/Reports'
-import Settings from './pages/Settings/Settings'
-import Admin from './pages/Admin/Admin'
-import Contact from './pages/Contact/Contact'
-import Plans from './pages/Plans/Plans'
-import Notifications from './pages/Notifications/Notifications'
-import Complaints from './pages/Complaints/Complaints'
+// All other routes lazy-loaded — drops initial bundle from ~1.4MB to ~400KB
+const AIConfig          = lazy(() => import('./pages/AIConfig/AIConfig'))
+const SalesAgent        = lazy(() => import('./pages/SalesAgent/SalesAgent'))
+const CommentAutomation = lazy(() => import('./pages/CommentAutomation/CommentAutomation'))
+const Conversations     = lazy(() => import('./pages/Conversations/Conversations'))
+const Orders            = lazy(() => import('./pages/Orders/Orders'))
+const Reports           = lazy(() => import('./pages/Reports/Reports'))
+const Settings          = lazy(() => import('./pages/Settings/Settings'))
+const Admin             = lazy(() => import('./pages/Admin/Admin'))
+const Contact           = lazy(() => import('./pages/Contact/Contact'))
+const Plans             = lazy(() => import('./pages/Plans/Plans'))
+const Notifications     = lazy(() => import('./pages/Notifications/Notifications'))
+const Complaints        = lazy(() => import('./pages/Complaints/Complaints'))
 import { SubscriptionProvider } from './lib/subscription'
 import { ConfirmProvider } from './components/ConfirmDialog/ConfirmDialog'
 import { on } from './lib/events'
 import { play } from './lib/sounds'
 import './styles/globals.css'
+
+function PageLoader() {
+  return (
+    <div style={{display:'flex', alignItems:'center', justifyContent:'center', minHeight:'60vh', color:'var(--text-secondary)', fontSize:14}}>
+      <div className="animate-spin" style={{width:32, height:32, border:'3px solid var(--accent)', borderTopColor:'transparent', borderRadius:'50%'}} />
+    </div>
+  )
+}
 
 function InactiveBanner({ status }) {
   const nav = useNavigate()
@@ -70,23 +80,25 @@ export default function App({ profile, onSubscriptionChange }) {
             {!isActive && <InactiveBanner status={profile?.subscription_status} />}
             <TitleBar theme={theme} toggleTheme={toggleTheme} isActive={isActive} onMenuClick={() => setSidebarOpen(true)} />
             <main className="app-main">
-              <Routes>
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                <Route path="/dashboard" element={<Dashboard />} />
-                {isAdmin && <Route path="/ai-config" element={<AIConfig />} />}
-                <Route path="/sales-agent" element={<SalesAgent />} />
-                <Route path="/comments" element={<CommentAutomation isAdmin={isAdmin} />} />
-                <Route path="/conversations" element={<Conversations />} />
-                <Route path="/orders" element={<Orders />} />
-                <Route path="/reports" element={<Reports />} />
-                <Route path="/settings" element={<Settings />} />
-                <Route path="/notifications" element={<Notifications />} />
-                <Route path="/complaints" element={<Complaints />} />
-                <Route path="/contact" element={<Contact />} />
-                <Route path="/plans" element={<Plans />} />
-                {isAdmin && <Route path="/admin" element={<Admin />} />}
-                <Route path="*" element={<Navigate to="/dashboard" replace />} />
-              </Routes>
+              <Suspense fallback={<PageLoader />}>
+                <Routes>
+                  <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  {isAdmin && <Route path="/ai-config" element={<AIConfig />} />}
+                  <Route path="/sales-agent" element={<SalesAgent />} />
+                  <Route path="/comments" element={<CommentAutomation isAdmin={isAdmin} />} />
+                  <Route path="/conversations" element={<Conversations />} />
+                  <Route path="/orders" element={<Orders />} />
+                  <Route path="/reports" element={<Reports />} />
+                  <Route path="/settings" element={<Settings />} />
+                  <Route path="/notifications" element={<Notifications />} />
+                  <Route path="/complaints" element={<Complaints />} />
+                  <Route path="/contact" element={<Contact />} />
+                  <Route path="/plans" element={<Plans />} />
+                  {isAdmin && <Route path="/admin" element={<Admin />} />}
+                  <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                </Routes>
+              </Suspense>
             </main>
           </div>
           <Toaster position="bottom-left" toastOptions={{
