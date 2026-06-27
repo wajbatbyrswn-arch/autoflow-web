@@ -348,3 +348,87 @@ input:checked + .toggle-slider::before { transform: translateX(-22px); backgroun
 .mt-4 { margin-top: 16px; }
 .w-full { width: 100%; }
 
+/* ────────────────────────────────────────────────────────────────────────
+   📱 RESPONSIVE DESIGN
+   Breakpoints: mobile <768px, tablet 768-1024px, desktop >1024px
+   ──────────────────────────────────────────────────────────────────────── */
+
+/* Tablet & smaller — shrink grid columns */
+@media (max-width: 1024px) {
+  .grid-4 { grid-template-columns: repeat(2, 1fr); }
+  .grid-3 { grid-template-columns: repeat(2, 1fr); }
+  .app-main { padding: 0 16px 16px 16px; }
+  body { user-select: text; } /* allow text selection on touch devices */
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  body { font-size: 13px; }
+  html, body, #root { overflow: auto; height: auto; min-height: 100%; }
+
+  /* Layout: sidebar becomes off-canvas drawer; main fills full width */
+  .app-layout { display: block; height: auto; min-height: 100vh; overflow: visible; }
+  .app-body { width: 100%; overflow: visible; }
+  .app-main { padding: 0 12px 12px 12px; overflow-y: visible; }
+
+  /* All grids collapse to single column */
+  .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; gap: 12px; }
+
+  /* Cards: tighter padding */
+  .card { padding: 16px; border-radius: var(--radius-lg); }
+  .card:hover { transform: none; } /* no hover lift on touch */
+  .card-title { font-size: 14px; margin-bottom: 14px; }
+
+  /* Headers smaller */
+  .page-header { margin-bottom: 18px; }
+  .page-header h1 { font-size: 20px; }
+  .page-header p { font-size: 13px; }
+
+  /* Buttons more touch-friendly + wrap */
+  .btn { padding: 10px 16px; font-size: 13px; }
+  .btn-sm { padding: 7px 12px; font-size: 12px; }
+
+  /* Tabs: scroll horizontally if too many */
+  .tabs { overflow-x: auto; max-width: 100%; padding: 4px; gap: 4px; flex-wrap: nowrap; }
+  .tab { padding: 8px 14px; font-size: 12px; white-space: nowrap; flex-shrink: 0; }
+
+  /* Tables scroll horizontally (already have .table-wrap with overflow-x:auto) */
+  th, td { padding: 10px 8px; font-size: 12px; }
+
+  /* Stat cards tighter */
+  .stat-card { padding: 16px; }
+  .stat-value { font-size: 24px; }
+  .stat-label { font-size: 11px; }
+
+  /* Inputs touch-friendly */
+  .input, .textarea, .select { padding: 12px 14px; font-size: 15px; /* 15px prevents iOS zoom */ }
+
+  /* Empty state tighter */
+  .empty-state { padding: 40px 16px; }
+}
+
+/* Show hamburger only on mobile */
+.mobile-menu-btn { display: none; }
+@media (max-width: 768px) {
+  .mobile-menu-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 40px; height: 40px; border-radius: var(--radius-md);
+    background: var(--bg-card); border: 1px solid var(--border);
+    color: var(--text-primary); cursor: pointer; transition: var(--transition);
+    margin-left: 8px;
+  }
+  .mobile-menu-btn:hover { background: var(--bg-card-hover); }
+}
+
+/* Sidebar overlay (mobile only) */
+.sidebar-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6); backdrop-filter: blur(2px);
+  z-index: 199;
+  animation: fadeIn 0.2s ease;
+}
+@media (max-width: 768px) {
+  .sidebar-overlay.open { display: block; }
+}
+

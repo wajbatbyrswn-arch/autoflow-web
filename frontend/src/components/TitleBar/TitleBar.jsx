@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, BellOff, Sun, Moon, Calendar, LogOut, Sparkles } from 'lucide-react'
+import { Bell, BellOff, Sun, Moon, Calendar, LogOut, Sparkles, Menu } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
 import { isMuted, setMuted } from '../../lib/sounds'
 import './TitleBar.css'
 
-export default function TitleBar({ theme, toggleTheme, isActive = true }) {
+export default function TitleBar({ theme, toggleTheme, isActive = true, onMenuClick = () => {} }) {
   const logout = async () => { await supabase.auth.signOut(); location.reload() }
   const nav = useNavigate()
   const [muted, setMutedLocal] = useState(() => isMuted())
@@ -33,6 +33,9 @@ export default function TitleBar({ theme, toggleTheme, isActive = true }) {
       <div className="titlebar-drag" />
 
       <div className="header-left-content">
+        <button className="mobile-menu-btn no-drag" onClick={onMenuClick} aria-label="فتح القائمة">
+          <Menu size={20} />
+        </button>
         <div className="header-titles">
           <h1 className="page-title">{storeName}</h1>
           <p className="page-subtitle">👋 مرحباً بك في لوحة التحكم</p>

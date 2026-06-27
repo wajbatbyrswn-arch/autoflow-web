@@ -41,7 +41,7 @@ function planLabel(status, plan, expires) {
   return { txt: `${plan === 'basic' ? 'الخطة الشهرية' : (plan || 'مفعّل')}${days != null ? ` — ${days} يوم` : ''}`, cls: 'active' }
 }
 
-export default function Sidebar({ isAdmin, profile = null }) {
+export default function Sidebar({ isAdmin, profile = null, isOpen = false, onClose = () => {} }) {
   const [storeInfo, setStoreInfo] = useState({ store_name: 'AutoFlow', store_logo: '' })
   const [counts, setCounts] = useState({ unread: 0, complaints: 0 })
 
@@ -86,7 +86,11 @@ export default function Sidebar({ isAdmin, profile = null }) {
   }, [])
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${isOpen ? 'open' : ''}`} onClick={(e) => {
+      // Close sidebar when a nav link is clicked on mobile
+      if (e.target.closest('.nav-item')) onClose()
+    }}>
+      <button className="sidebar-close-btn" onClick={onClose} aria-label="إغلاق القائمة">✕</button>
       <div className="sidebar-logo">
         <div className="logo-img-container">
           <img src={storeInfo.store_logo || logoImg} alt="AutoFlow Logo" className="app-logo-img" />

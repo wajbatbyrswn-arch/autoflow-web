@@ -40,6 +40,7 @@ function InactiveBanner({ status }) {
 
 export default function App({ profile, onSubscriptionChange }) {
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'dark')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const isAdmin = !!profile?.is_admin
   const isActive = profile?.subscription_status === 'active'
 
@@ -63,10 +64,11 @@ export default function App({ profile, onSubscriptionChange }) {
       <ConfirmProvider>
       <HashRouter>
         <div className="app-layout">
-          <Sidebar isAdmin={isAdmin} profile={profile} />
+          <Sidebar isAdmin={isAdmin} profile={profile} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+          <div className={`sidebar-overlay ${sidebarOpen ? 'open' : ''}`} onClick={() => setSidebarOpen(false)} />
           <div className="app-body">
             {!isActive && <InactiveBanner status={profile?.subscription_status} />}
-            <TitleBar theme={theme} toggleTheme={toggleTheme} isActive={isActive} />
+            <TitleBar theme={theme} toggleTheme={toggleTheme} isActive={isActive} onMenuClick={() => setSidebarOpen(true)} />
             <main className="app-main">
               <Routes>
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
