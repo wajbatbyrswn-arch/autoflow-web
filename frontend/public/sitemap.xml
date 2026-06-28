@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/0.9">
+
+  <url>
+    <loc>https://autoflowchat.shop/</loc>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://autoflowchat.shop/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://autoflowchat.shop/" />
+    <lastmod>2026-06-28</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <image:image>
+      <image:loc>https://autoflowchat.shop/favicon.jpg</image:loc>
+      <image:title>AutoFlow Chat — منصة أتمتة المحادثات بالذكاء الاصطناعي</image:title>
+      <image:caption>منصة عربية لأتمتة المبيعات والرد على الزبائن بالذكاء الاصطناعي</image:caption>
+    </image:image>
+  </url>
+
+  <url>
+    <loc>https://autoflowchat.shop/#product</loc>
+    <lastmod>2026-06-28</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+  <url>
+    <loc>https://autoflowchat.shop/#how</loc>
+    <lastmod>2026-06-28</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <url>
+    <loc>https://autoflowchat.shop/#pricing</loc>
+    <lastmod>2026-06-28</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+  <url>
+    <loc>https://autoflowchat.shop/#testimonials</loc>
+    <lastmod>2026-06-28</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+
+  <url>
+    <loc>https://autoflowchat.shop/#about</loc>
+    <lastmod>2026-06-28</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <url>
+    <loc>https://autoflowchat.shop/#contact</loc>
+    <lastmod>2026-06-28</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+</urlset>

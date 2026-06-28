@@ -1,0 +1,60 @@
+# AutoFlow Chat - robots.txt
+# https://autoflowchat.shop/
+
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /admin
+Disallow: /conversations
+Disallow: /orders
+Disallow: /settings
+Disallow: /notifications
+Disallow: /complaints
+Disallow: /ai-config
+Disallow: /sales-agent
+Disallow: /comments
+Disallow: /reports
+Disallow: /oauth-callback.html
+
+# Allow main crawlers explicitly
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: Slurp
+Allow: /
+
+User-agent: DuckDuckBot
+Allow: /
+
+User-agent: Baiduspider
+Allow: /
+
+User-agent: YandexBot
+Allow: /
+
+User-agent: facebookexternalhit
+Allow: /
+
+User-agent: Twitterbot
+Allow: /
+
+User-agent: WhatsApp
+Allow: /
+
+User-agent: TelegramBot
+Allow: /
+
+# Block AI training crawlers (optional — remove if you want AI training)
+User-agent: GPTBot
+Disallow: /
+
+User-agent: ChatGPT-User
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+Sitemap: https://autoflowchat.shop/sitemap.xml
