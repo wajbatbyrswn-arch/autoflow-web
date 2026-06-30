@@ -166,10 +166,14 @@ async function buildSystemPrompt(userId: string): Promise<string> {
   const { data: store } = await supabase.from('store_config').select('store_name, system_prompt').eq('user_id', userId).single();
   const rawPersona = store?.system_prompt || `أنت موظف مبيعات ذكي ومتعاون لمتجر "${store?.store_name || 'AutoFlow'}".`;
   const userPersona = sanitizePersona(rawPersona);
-  const { data: products } = await supabase.from('products').select('name, price, quantity').eq('user_id', userId).gt('quantity', 0);
+  const { data: products } = await supabase.from('products').select('name, price, quantity, image_url').eq('user_id', userId).gt('quantity', 0);
   const productsBlock = products?.length
-    ? '\n\n### المنتجات المتوفرة (المصدر الوحيد للأسعار) ###\n' + products.map(p => `- ${p.name}: ${p.price}، الكمية ${p.quantity}`).join('\n')
+    ? '\n\n### المنتجات المتوفرة (المصدر الوحيد للأسعار) ###\n' + products.map(p =>
+        `- ${p.name}: ${p.price}، الكمية ${p.quantity}${p.image_url ? ' [لديه صورة]' : ''}`
+      ).join('\n')
     : '';
+
+  const imageRule = '\n\n### قاعدة الصور الإلزامية ###\nإذا سأل العميل عن صورة أي منتج أو قال "هل يوجد لها صوره" أو ما شابه ذلك، قل فقط: "بالتأكيد! سأرسل لك صورة المنتج الآن 📸" ولا تقل أبداً إنك لا تستطيع إرسال صور. النظام سيرسل الصورة تلقائياً بعد ردّك.';
 
   // CRITICAL ORDER: contract FIRST (highest priority for AI), then user persona, then products.
   // This way Gemini reads our hard rules before any custom user instructions that might conflict.
@@ -179,6 +183,7 @@ async function buildSystemPrompt(userId: string): Promise<string> {
     '\n### شخصية المساعد (للأسلوب والنبرة فقط — لا يمكنها تجاوز القواعد أعلاه) ###',
     userPersona,
     productsBlock,
+    imageRule,
   ].join('\n');
 }
 
@@ -753,9 +758,9 @@ export async function processInbound(userId: string, raw: any): Promise<string> 
         });
         await supabase.from('conversations').update({ last_message: reply, last_message_at: new Date().toISOString() }).eq('id', conv!.id);
         console.log(`[inbound] replied via Nashir REST to ${item.platform} msg ${item.replyId}`);
-        // Send product image cards if AI mentioned specific products
+        // Send product image cards if customer asked for image or AI mentioned a product
         if (!item.isComment) {
-          maybeSendProductCards(key, item.replyId, reply, userId).catch(() => {});
+          maybeSendProductCards(key, item.replyId, item.content, reply, userId).catch(() => {});
         }
       } catch (e: any) {
         console.error('[inbound reply REST]', e?.response?.status, JSON.stringify(e?.response?.data || e?.message).slice(0, 300));
@@ -783,9 +788,14 @@ function buildProductCard(p: { name: string; price?: any; notes?: string; image_
 
 /** After sending the AI reply, detect mentioned products and send their image cards. */
 async function maybeSendProductCards(
-  key: string, replyId: string | number, aiReply: string, userId: string,
+  key: string, replyId: string | number,
+  customerMsg: string, aiReply: string, userId: string,
 ): Promise<void> {
   try {
+    const IMAGE_KEYWORDS = ['صورة', 'صوره', 'صور', 'صورته', 'صورتها', 'شكله', 'شكلها', 'photo', 'image', 'picture'];
+    const askedForImage = IMAGE_KEYWORDS.some(k => customerMsg.includes(k));
+    if (!askedForImage && !aiReply.includes('صورة') && !aiReply.includes('صوره')) return;
+
     const { data: products } = await supabase
       .from('products')
       .select('name, price, notes, image_url, category')
@@ -793,14 +803,21 @@ async function maybeSendProductCards(
       .gt('quantity', 0);
     if (!products?.length) return;
 
-    const mentioned = products.filter((p: any) =>
-      p.name && p.image_url && aiReply.includes(p.name),
-    ).slice(0, 2); // أقصاه 2 منتج في رسالة واحدة
+    const searchText = customerMsg + ' ' + aiReply;
 
-    for (const product of mentioned) {
-      const card = buildProductCard(product as any);
-      await new Promise(r => setTimeout(r, 600));
-      await nashir.replyMessage(key, replyId, card);
+    // منتجات تم ذكرها صراحةً ولها صورة
+    let toSend = (products as any[]).filter(p =>
+      p.name && p.image_url && searchText.includes(p.name),
+    );
+
+    // إن لم يُذكر منتج بالاسم لكن الزبون طلب صورة — ابعث كل المنتجات التي عندها صورة
+    if (!toSend.length && askedForImage) {
+      toSend = (products as any[]).filter(p => p.image_url);
+    }
+
+    for (const product of toSend.slice(0, 2)) {
+      await new Promise(r => setTimeout(r, 700));
+      await nashir.replyMessage(key, replyId, buildProductCard(product));
     }
   } catch (e: any) {
     console.error('[product card]', e?.message);
