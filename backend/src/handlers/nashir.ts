@@ -20,8 +20,18 @@ export const nashir = {
     client(key).get('/messages', { params: { is_read: false, limit: 50, ...(accountId ? { account_id: accountId } : {}) } }).then(r => r.data.data || []),
   unreadComments: (key: string, accountId?: string) =>
     client(key).get('/comments', { params: { is_read: false, limit: 50, ...(accountId ? { account_id: accountId } : {}) } }).then(r => r.data.data || []),
-  replyMessage: (key: string, id: number | string, message: string, pageId?: string) =>
-    client(key).post(`/messages/${id}/reply`, { message, ...(pageId ? { pageId } : {}) }).then(r => r.data),
+  replyMessage: (key: string, id: number | string, message: string, pageId?: string, imageUrl?: string) =>
+    client(key).post(`/messages/${id}/reply`, {
+      message,
+      ...(pageId ? { pageId } : {}),
+      ...(imageUrl ? { image_url: imageUrl } : {}),
+    }).then(r => r.data),
+  replyMessageImage: (key: string, id: number | string, imageUrl: string, pageId?: string) =>
+    client(key).post(`/messages/${id}/reply`, {
+      message: ' ',
+      image_url: imageUrl,
+      ...(pageId ? { pageId } : {}),
+    }).then(r => r.data),
   replyComment: (key: string, id: number | string, message: string, pageId?: string) =>
     client(key).post(`/comments/${id}/reply`, { message, ...(pageId ? { pageId } : {}) }).then(r => r.data),
   markRead: (key: string, id: number | string) => client(key).patch(`/messages/${id}/read`).then(r => r.data),

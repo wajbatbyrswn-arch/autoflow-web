@@ -770,8 +770,8 @@ export async function processInbound(userId: string, raw: any): Promise<string> 
   return reply;
 }
 
-/** Build a formatted product card text to send after mentioning a product. */
-function buildProductCard(p: { name: string; price?: any; notes?: string; image_url?: string; category?: string }): string {
+/** Build a short product info text (without the image URL — image is sent separately). */
+function buildProductCard(p: { name: string; price?: any; notes?: string; category?: string }): string {
   const lines = [
     `📦 *${p.name}*`,
     `━━━━━━━━━━━━━`,
@@ -779,14 +779,10 @@ function buildProductCard(p: { name: string; price?: any; notes?: string; image_
   ];
   if (p.category) lines.push(`🏷️ الفئة: ${p.category}`);
   if (p.notes) lines.push(`📝 ${p.notes}`);
-  if (p.image_url) {
-    lines.push('');
-    lines.push(`🖼️ صورة المنتج:\n${p.image_url}`);
-  }
   return lines.join('\n');
 }
 
-/** After sending the AI reply, detect mentioned products and send their image cards. */
+/** After sending the AI reply, detect mentioned products and send their images via Nashir. */
 async function maybeSendProductCards(
   key: string, replyId: string | number,
   customerMsg: string, aiReply: string, userId: string,
@@ -816,8 +812,11 @@ async function maybeSendProductCards(
     }
 
     for (const product of toSend.slice(0, 2)) {
-      await new Promise(r => setTimeout(r, 700));
+      // أرسل النص أولاً ثم الصورة كـ image message حقيقية
+      await new Promise(r => setTimeout(r, 600));
       await nashir.replyMessage(key, replyId, buildProductCard(product));
+      await new Promise(r => setTimeout(r, 400));
+      await nashir.replyMessageImage(key, replyId, product.image_url);
     }
   } catch (e: any) {
     console.error('[product card]', e?.message);
