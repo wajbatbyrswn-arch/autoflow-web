@@ -26,12 +26,25 @@ export const nashir = {
       ...(pageId ? { pageId } : {}),
       ...(imageUrl ? { image_url: imageUrl } : {}),
     }).then(r => r.data),
-  replyMessageImage: (key: string, id: number | string, imageUrl: string, pageId?: string) =>
-    client(key).post(`/messages/${id}/reply`, {
-      message: ' ',
-      image_url: imageUrl,
-      ...(pageId ? { pageId } : {}),
-    }).then(r => r.data),
+  // Upload a base64 data URL (data:image/...;base64,XXX) to Nashir's /upload endpoint,
+  // returns a public HTTPS URL that Meta can fetch. Required because product images are
+  // stored as base64 data URLs in the DB, and Meta cannot fetch data: URLs.
+  uploadImage: async (key: string, dataUrl: string): Promise<string | null> => {
+    const m = dataUrl.match(/^data:(image\/[a-z0-9.+-]+);base64,(.+)$/i);
+    if (!m) return null;
+    const contentType = m[1];
+    const buffer = Buffer.from(m[2], 'base64');
+    const ext = (contentType.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
+    const form = new FormData();
+    form.append('file', new Blob([buffer], { type: contentType }), `product.${ext}`);
+    try {
+      const res = await client(key).post('/upload', form, { timeout: 30000 });
+      return res.data?.url || res.data?.data?.url || null;
+    } catch (e: any) {
+      console.error('[nashir upload]', e?.response?.status, JSON.stringify(e?.response?.data || e?.message).slice(0, 200));
+      return null;
+    }
+  },
   replyComment: (key: string, id: number | string, message: string, pageId?: string) =>
     client(key).post(`/comments/${id}/reply`, { message, ...(pageId ? { pageId } : {}) }).then(r => r.data),
   markRead: (key: string, id: number | string) => client(key).patch(`/messages/${id}/read`).then(r => r.data),

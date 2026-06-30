@@ -770,16 +770,31 @@ export async function processInbound(userId: string, raw: any): Promise<string> 
   return reply;
 }
 
-/** Build a short product info text (without the image URL — image is sent separately). */
-function buildProductCard(p: { name: string; price?: any; notes?: string; category?: string }): string {
-  const lines = [
-    `📦 *${p.name}*`,
-    `━━━━━━━━━━━━━`,
-    `💰 السعر: ${p.price ?? '—'}`,
-  ];
-  if (p.category) lines.push(`🏷️ الفئة: ${p.category}`);
-  if (p.notes) lines.push(`📝 ${p.notes}`);
+/** Build a short, clean caption (NO markdown — Meta renders * and _ literally). */
+function buildProductCaption(p: { name: string; price?: any; notes?: string }): string {
+  const lines = [p.name];
+  if (p.price != null && p.price !== '') lines.push(`السعر: ${p.price}`);
+  if (p.notes) lines.push(p.notes);
   return lines.join('\n');
+}
+
+/**
+ * Resolve a product image to a public HTTPS URL Meta can fetch.
+ * Product images are stored as base64 data URLs in the DB; Meta cannot fetch those,
+ * so we upload to Nashir once and cache the returned public URL back on the product row.
+ */
+async function resolvePublicImageUrl(
+  key: string, productId: number | string, imageUrl: string, userId: string,
+): Promise<string | null> {
+  if (!imageUrl) return null;
+  if (!imageUrl.startsWith('data:')) return imageUrl; // already a public URL
+  const publicUrl = await nashir.uploadImage(key, imageUrl);
+  if (publicUrl) {
+    // Cache so we never re-upload this product's image again.
+    await supabase.from('products').update({ image_url: publicUrl })
+      .eq('id', productId).eq('user_id', userId);
+  }
+  return publicUrl;
 }
 
 /** After sending the AI reply, detect mentioned products and send their images via Nashir. */
@@ -794,29 +809,33 @@ async function maybeSendProductCards(
 
     const { data: products } = await supabase
       .from('products')
-      .select('name, price, notes, image_url, category')
+      .select('id, name, price, notes, image_url')
       .eq('user_id', userId)
       .gt('quantity', 0);
     if (!products?.length) return;
 
     const searchText = customerMsg + ' ' + aiReply;
 
-    // منتجات تم ذكرها صراحةً ولها صورة
+    // منتجات ذُكرت صراحةً ولها صورة
     let toSend = (products as any[]).filter(p =>
       p.name && p.image_url && searchText.includes(p.name),
     );
 
-    // إن لم يُذكر منتج بالاسم لكن الزبون طلب صورة — ابعث كل المنتجات التي عندها صورة
+    // إن لم يُذكر منتج بالاسم لكن الزبون طلب صورة — ابعث المنتجات التي عندها صورة
     if (!toSend.length && askedForImage) {
       toSend = (products as any[]).filter(p => p.image_url);
     }
 
     for (const product of toSend.slice(0, 2)) {
-      // أرسل النص أولاً ثم الصورة كـ image message حقيقية
-      await new Promise(r => setTimeout(r, 600));
-      await nashir.replyMessage(key, replyId, buildProductCard(product));
-      await new Promise(r => setTimeout(r, 400));
-      await nashir.replyMessageImage(key, replyId, product.image_url);
+      const publicUrl = await resolvePublicImageUrl(key, product.id, product.image_url, userId);
+      await new Promise(r => setTimeout(r, 500));
+      if (publicUrl) {
+        // النص + الصورة في رسالة واحدة (الصورة كمرفق حقيقي)
+        await nashir.replyMessage(key, replyId, buildProductCaption(product), undefined, publicUrl);
+      } else {
+        // فشل الرفع — أرسل النص فقط
+        await nashir.replyMessage(key, replyId, buildProductCaption(product));
+      }
     }
   } catch (e: any) {
     console.error('[product card]', e?.message);
