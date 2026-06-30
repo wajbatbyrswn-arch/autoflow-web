@@ -753,12 +753,58 @@ export async function processInbound(userId: string, raw: any): Promise<string> 
         });
         await supabase.from('conversations').update({ last_message: reply, last_message_at: new Date().toISOString() }).eq('id', conv!.id);
         console.log(`[inbound] replied via Nashir REST to ${item.platform} msg ${item.replyId}`);
+        // Send product image cards if AI mentioned specific products
+        if (!item.isComment) {
+          maybeSendProductCards(key, item.replyId, reply, userId).catch(() => {});
+        }
       } catch (e: any) {
         console.error('[inbound reply REST]', e?.response?.status, JSON.stringify(e?.response?.data || e?.message).slice(0, 300));
       }
     }
   }
   return reply;
+}
+
+/** Build a formatted product card text to send after mentioning a product. */
+function buildProductCard(p: { name: string; price?: any; notes?: string; image_url?: string; category?: string }): string {
+  const lines = [
+    `📦 *${p.name}*`,
+    `━━━━━━━━━━━━━`,
+    `💰 السعر: ${p.price ?? '—'}`,
+  ];
+  if (p.category) lines.push(`🏷️ الفئة: ${p.category}`);
+  if (p.notes) lines.push(`📝 ${p.notes}`);
+  if (p.image_url) {
+    lines.push('');
+    lines.push(`🖼️ صورة المنتج:\n${p.image_url}`);
+  }
+  return lines.join('\n');
+}
+
+/** After sending the AI reply, detect mentioned products and send their image cards. */
+async function maybeSendProductCards(
+  key: string, replyId: string | number, aiReply: string, userId: string,
+): Promise<void> {
+  try {
+    const { data: products } = await supabase
+      .from('products')
+      .select('name, price, notes, image_url, category')
+      .eq('user_id', userId)
+      .gt('quantity', 0);
+    if (!products?.length) return;
+
+    const mentioned = products.filter((p: any) =>
+      p.name && p.image_url && aiReply.includes(p.name),
+    ).slice(0, 2); // أقصاه 2 منتج في رسالة واحدة
+
+    for (const product of mentioned) {
+      const card = buildProductCard(product as any);
+      await new Promise(r => setTimeout(r, 600));
+      await nashir.replyMessage(key, replyId, card);
+    }
+  } catch (e: any) {
+    console.error('[product card]', e?.message);
+  }
 }
 
 /** Handle a Nashir webhook payload; also returns the reply (in case Nashir uses the response). */

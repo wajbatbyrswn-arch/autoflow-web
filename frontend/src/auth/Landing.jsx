@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import logoImg from '../assets/logo.jpg'
+import Mascot from '../components/Mascot/Mascot'
 import './Landing.css'
 
 const WHATSAPP_LINK = 'https://wa.me/962770748793'
@@ -544,6 +545,8 @@ export default function Landing() {
       <main className="lp-main" key={active}>
         <ActiveTab />
       </main>
+
+      <Mascot />
 
       <footer className="lp-footer">
         <div className="lp-container lp-footer-inner">
