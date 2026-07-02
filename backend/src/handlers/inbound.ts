@@ -523,8 +523,12 @@ async function maybeCompressHistory(convId: number, userId: string, config: any)
   }
 }
 
-/** Process one inbound item: store it, get AI reply, and SEND it back via Nashir REST. Returns the reply text. */
-export async function processInbound(userId: string, raw: any): Promise<string> {
+/** Process one inbound item: store it, get AI reply, and SEND it back via Nashir REST. Returns the reply text.
+ *  opts.skipAI: store the message + conversation only (no AI, no outbound reply).
+ *  Used by the poller for backlog/older messages so customers never get late replies. */
+export async function processInbound(userId: string, raw: any, opts?: { skipAI?: boolean }): Promise<string> {
+  // Never react to our own outbound replies (Nashir saves them into the same inbox).
+  if (raw?.is_our_reply) return '';
   // Nashir webhook redacts phones/emails to "[phone]"/"[email]" for safety. The REST
   // list endpoint returns the ORIGINAL un-redacted message AND a safety_flags object
   // with arrays of what was stripped. When we see a redaction in the webhook, fetch
@@ -575,6 +579,10 @@ export async function processInbound(userId: string, raw: any): Promise<string> 
   }
 
   const { data: exists } = await supabase.from('messages').select('id').eq('user_id', userId).eq('nashir_message_id', item.dedupKey).single();
+  // HARD dedup: a message we already stored was already replied to (or intentionally skipped).
+  // Never re-run the AI or re-send a reply for it — this is what used to burn the Gemini
+  // quota and would spam customers when the poller re-sees unread messages.
+  if (exists) return '';
 
   let conv: any;
   const found = await supabase.from('conversations').select('*')
@@ -588,6 +596,19 @@ export async function processInbound(userId: string, raw: any): Promise<string> 
     conv = created.data;
   } else {
     await supabase.from('conversations').update({ last_message: item.content, last_message_at: new Date().toISOString() }).eq('id', conv.id);
+  }
+
+  // skipAI mode (poller backlog): store the message so it shows in the inbox, notify the
+  // UI, but never generate or send a reply — replying hours late confuses customers.
+  if (opts?.skipAI) {
+    await supabase.from('messages').insert({
+      user_id: userId, conversation_id: conv!.id, nashir_message_id: item.dedupKey,
+      nashir_reply_id: item.replyId ? String(item.replyId) : null,
+      sender: 'customer', content: item.content, message_type: item.isComment ? 'comment' : 'dm',
+      raw_payload: raw,
+    });
+    emit(userId, `${item.base}:message`, { convId: conv!.id, platform: item.platform });
+    return '';
   }
 
   // ---- Complaint detection (runs BEFORE AI to short-circuit) ----

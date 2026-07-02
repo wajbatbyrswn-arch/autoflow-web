@@ -169,7 +169,9 @@ process.on('uncaughtException', (err) => {
 
 app.listen(PORT, () => {
   console.log(`AutoFlow API running on port ${PORT}`);
-  // Poller is opt-in (set ENABLE_POLLER=1). Disabled by default — ingestion will
-  // move to the Nashir webhook, and the broad poll was exhausting the Gemini quota.
-  if (process.env.ENABLE_POLLER === '1') startPoller();
+  // The poller is the PRIMARY ingestion path: Nashir has no webhook for incoming DMs
+  // (its webhooks only fire on post.published). The old quota-exhaustion problem is
+  // fixed at the source: hard dedup in processInbound + markRead after processing,
+  // so each message is AI-processed exactly once. Set DISABLE_POLLER=1 to turn off.
+  if (process.env.DISABLE_POLLER !== '1') startPoller();
 });
