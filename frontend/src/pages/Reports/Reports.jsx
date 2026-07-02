@@ -4,6 +4,7 @@ import {
   PieChart, Pie, Cell, AreaChart, Area, CartesianGrid, Legend,
 } from 'recharts'
 import { useCurrency } from '../../lib/useCurrency'
+import { useT } from '../../lib/i18n'
 import { TrendingUp, ShoppingCart, Users, DollarSign, Clock, Package,
          CheckCircle, AlertOctagon, BarChart3, PieChart as PieIcon } from 'lucide-react'
 import './Reports.css'
@@ -48,6 +49,7 @@ function StatCard({ icon: Icon, label, value, hint, color, delta }) {
 }
 
 export default function Reports() {
+  const { t, lang } = useT()
   const currency = useCurrency()
   const [stats, setStats] = useState({
     orders_by_day: [], top_products: [], messages_today: 0, orders_today: 0,
@@ -88,7 +90,7 @@ export default function Reports() {
       const key = d.toISOString().slice(0, 10)
       const row = map.get(key) || { count: 0, revenue: 0 }
       arr.push({
-        day: d.toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' }),
+        day: d.toLocaleDateString(lang === 'en' ? 'en-GB' : 'ar-EG', { day: 'numeric', month: 'short' }),
         orders: Number(row.count || 0),
         revenue: Math.round(Number(row.revenue || 0)),
       })
@@ -97,13 +99,13 @@ export default function Reports() {
   }, [stats.orders_by_day, range])
 
   const platformData = (stats.platform_distribution || []).map(p => ({
-    name: PLATFORM_NAMES[p.platform] || p.platform || '—',
+    name: PLATFORM_NAMES[p.platform] ? t(PLATFORM_NAMES[p.platform]) : (p.platform || '—'),
     value: p.count || 0,
     platformKey: p.platform,
   })).filter(p => p.value > 0)
 
   const statusData = (stats.status_distribution || []).map(s => ({
-    name: STATUS_NAMES[s.status] || s.status || '—',
+    name: STATUS_NAMES[s.status] ? t(STATUS_NAMES[s.status]) : (s.status || '—'),
     value: s.count || 0,
     statusKey: s.status,
   }))
@@ -123,43 +125,43 @@ export default function Reports() {
       <div className="page-header rep-head">
         <div className="rep-head-text">
           <div className="rep-head-eyebrow">
-            <BarChart3 size={14}/> التقارير والتحليلات
+            <BarChart3 size={14}/> {t('التقارير والتحليلات')}
           </div>
-          <h1>أداء متجرك بنظرة واحدة</h1>
-          <p>تحليل عميق لكل ما يحدث — إيرادات، طلبات، عملاء، منصات، وأوقات الذروة.</p>
+          <h1>{t('أداء متجرك بنظرة واحدة')}</h1>
+          <p>{t('تحليل عميق لكل ما يحدث — إيرادات، طلبات، عملاء، منصات، وأوقات الذروة.')}</p>
         </div>
         <div className="rep-controls">
           <div className="rep-tabs">
-            <button className={range === '7' ? 'on' : ''} onClick={() => setRange('7')}>7 أيام</button>
-            <button className={range === '30' ? 'on' : ''} onClick={() => setRange('30')}>30 يوم</button>
+            <button className={range === '7' ? 'on' : ''} onClick={() => setRange('7')}>{t('7 أيام')}</button>
+            <button className={range === '30' ? 'on' : ''} onClick={() => setRange('30')}>{t('30 يوم')}</button>
           </div>
-          <button className="btn btn-secondary" onClick={load}>↻ تحديث</button>
+          <button className="btn btn-secondary" onClick={load}>↻ {t('تحديث')}</button>
         </div>
       </div>
 
       {/* KPI cards row */}
       <div className="kpi-grid">
-        <StatCard icon={DollarSign} label="إجمالي الإيرادات" color="#10b981"
+        <StatCard icon={DollarSign} label={t('إجمالي الإيرادات')} color="#10b981"
           value={`${Number(stats.revenue_total || 0).toLocaleString()} ${currency}`}
-          delta={d.revenue_pct} hint="من الطلبات المسلَّمة فقط" />
-        <StatCard icon={ShoppingCart} label="إجمالي الطلبات" color="#3b82f6"
+          delta={d.revenue_pct} hint={t('من الطلبات المسلَّمة فقط')} />
+        <StatCard icon={ShoppingCart} label={t('إجمالي الطلبات')} color="#3b82f6"
           value={stats.orders_total || 0} delta={d.orders_pct}
-          hint={`مُسلَّمة: ${stats.delivered_count || 0}`} />
-        <StatCard icon={Package} label="متوسط قيمة الطلب" color="#f59e0b"
+          hint={`${t('مُسلَّمة')}: ${stats.delivered_count || 0}`} />
+        <StatCard icon={Package} label={t('متوسط قيمة الطلب')} color="#f59e0b"
           value={`${avgOrderValue.toLocaleString()} ${currency}`}
-          delta={d.avg_pct} hint="للطلب المُسلَّم" />
-        <StatCard icon={TrendingUp} label="معدل التحويل" color="#8b5cf6"
-          value={`${conversionRate}%`} hint={`${stats.messages_today} رسالة → ${stats.orders_today} طلب اليوم`} />
-        <StatCard icon={CheckCircle} label="معدل الإتمام" color="#06b6d4"
+          delta={d.avg_pct} hint={t('للطلب المُسلَّم')} />
+        <StatCard icon={TrendingUp} label={t('معدل التحويل')} color="#8b5cf6"
+          value={`${conversionRate}%`} hint={`${stats.messages_today} ${t('رسالة')} → ${stats.orders_today} ${t('طلب اليوم')}`} />
+        <StatCard icon={CheckCircle} label={t('معدل الإتمام')} color="#06b6d4"
           value={`${completionRate}%`} hint={`${stats.delivered_count}/${stats.orders_total}`} />
-        <StatCard icon={Users} label="محادثات نشطة" color="#ec4899"
-          value={stats.active_conversations || 0} hint="حالياً تحت المعالجة" />
+        <StatCard icon={Users} label={t('محادثات نشطة')} color="#ec4899"
+          value={stats.active_conversations || 0} hint={t('حالياً تحت المعالجة')} />
       </div>
 
       {/* Main chart: revenue + orders area combo */}
       <div className="card rep-card">
         <div className="rep-card-head">
-          <div className="rep-card-title"><TrendingUp size={16}/> الإيرادات والطلبات — آخر {range} يوم</div>
+          <div className="rep-card-title"><TrendingUp size={16}/> {t('الإيرادات والطلبات — آخر')} {range} {t('يوم')}</div>
         </div>
         <div style={{ height: 320 }}>
           <ResponsiveContainer width="100%" height="100%">
@@ -179,8 +181,8 @@ export default function Reports() {
               <YAxis tick={{ fill:'var(--text-muted)', fontSize: 11 }} axisLine={false} tickLine={false}/>
               <Tooltip contentStyle={{ background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:12, fontFamily:'Cairo' }} />
               <Legend />
-              <Area type="monotone" dataKey="revenue" name={`الإيرادات (${currency})`} stroke="#2BB24C" strokeWidth={3} fill="url(#gRev)" />
-              <Area type="monotone" dataKey="orders"  name="عدد الطلبات" stroke="#1B3A8C" strokeWidth={3} fill="url(#gOrd)" />
+              <Area type="monotone" dataKey="revenue" name={`${t('الإيرادات')} (${currency})`} stroke="#2BB24C" strokeWidth={3} fill="url(#gRev)" />
+              <Area type="monotone" dataKey="orders"  name={t('عدد الطلبات')} stroke="#1B3A8C" strokeWidth={3} fill="url(#gOrd)" />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -189,7 +191,7 @@ export default function Reports() {
       {/* Two-column row: daily orders bars + status pie */}
       <div className="rep-grid-2">
         <div className="card rep-card">
-          <div className="rep-card-head"><div className="rep-card-title"><BarChart3 size={16}/> طلبات يومية</div></div>
+          <div className="rep-card-head"><div className="rep-card-title"><BarChart3 size={16}/> {t('طلبات يومية')}</div></div>
           <div style={{ height: 280 }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={daily}>
@@ -197,14 +199,14 @@ export default function Reports() {
                 <XAxis dataKey="day" tick={{ fill:'var(--text-muted)', fontSize: 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd"/>
                 <YAxis allowDecimals={false} tick={{ fill:'var(--text-muted)', fontSize: 10 }} axisLine={false} tickLine={false}/>
                 <Tooltip contentStyle={{ background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:12, fontFamily:'Cairo' }} />
-                <Bar dataKey="orders" name="طلبات" fill="#1B3A8C" radius={[8,8,0,0]}/>
+                <Bar dataKey="orders" name={t('طلبات')} fill="#1B3A8C" radius={[8,8,0,0]}/>
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
 
         <div className="card rep-card">
-          <div className="rep-card-head"><div className="rep-card-title"><PieIcon size={16}/> توزيع الحالات</div></div>
+          <div className="rep-card-head"><div className="rep-card-title"><PieIcon size={16}/> {t('توزيع الحالات')}</div></div>
           <div style={{ height: 280, display:'flex', alignItems:'center' }}>
             {statusData.some(s => s.value > 0) ? (
               <ResponsiveContainer width="100%" height="100%">
@@ -216,7 +218,7 @@ export default function Reports() {
                   <Tooltip />
                 </PieChart>
               </ResponsiveContainer>
-            ) : <div style={{ width:'100%', textAlign:'center', opacity:.5 }}>لا توجد بيانات</div>}
+            ) : <div style={{ width:'100%', textAlign:'center', opacity:.5 }}>{t('لا توجد بيانات')}</div>}
           </div>
         </div>
       </div>
@@ -224,7 +226,7 @@ export default function Reports() {
       {/* Two-column row: peak hours + platforms */}
       <div className="rep-grid-2">
         <div className="card rep-card">
-          <div className="rep-card-head"><div className="rep-card-title"><Clock size={16}/> أوقات الذروة (آخر 30 يوم)</div></div>
+          <div className="rep-card-head"><div className="rep-card-title"><Clock size={16}/> {t('أوقات الذروة (آخر 30 يوم)')}</div></div>
           <div style={{ height: 240 }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={peakHours}>
@@ -232,14 +234,14 @@ export default function Reports() {
                 <XAxis dataKey="hour" interval={2} tick={{ fill:'var(--text-muted)', fontSize: 10 }} axisLine={false} tickLine={false}/>
                 <YAxis allowDecimals={false} tick={{ fill:'var(--text-muted)', fontSize: 10 }} axisLine={false} tickLine={false}/>
                 <Tooltip contentStyle={{ background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:12, fontFamily:'Cairo' }} />
-                <Bar dataKey="count" name="طلبات" fill="#f59e0b" radius={[6,6,0,0]}/>
+                <Bar dataKey="count" name={t('طلبات')} fill="#f59e0b" radius={[6,6,0,0]}/>
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
 
         <div className="card rep-card">
-          <div className="rep-card-head"><div className="rep-card-title"><BarChart3 size={16}/> توزيع المنصات</div></div>
+          <div className="rep-card-head"><div className="rep-card-title"><BarChart3 size={16}/> {t('توزيع المنصات')}</div></div>
           <div style={{ height: 240 }}>
             {platformData.length ? (
               <ResponsiveContainer width="100%" height="100%">
@@ -248,12 +250,12 @@ export default function Reports() {
                   <XAxis type="number" allowDecimals={false} tick={{ fill:'var(--text-muted)', fontSize: 10 }} axisLine={false} tickLine={false}/>
                   <YAxis type="category" dataKey="name" tick={{ fill:'var(--text-muted)', fontSize: 12 }} axisLine={false} tickLine={false} width={80}/>
                   <Tooltip contentStyle={{ background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:12, fontFamily:'Cairo' }} />
-                  <Bar dataKey="value" name="طلبات" radius={[0,8,8,0]}>
+                  <Bar dataKey="value" name={t('طلبات')} radius={[0,8,8,0]}>
                     {platformData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
-            ) : <div style={{ height:'100%', display:'flex', alignItems:'center', justifyContent:'center', opacity:.5 }}>لا توجد بيانات</div>}
+            ) : <div style={{ height:'100%', display:'flex', alignItems:'center', justifyContent:'center', opacity:.5 }}>{t('لا توجد بيانات')}</div>}
           </div>
         </div>
       </div>
@@ -261,7 +263,7 @@ export default function Reports() {
       {/* Two-column: top products + KPI summary */}
       <div className="rep-grid-2">
         <div className="card rep-card">
-          <div className="rep-card-head"><div className="rep-card-title"><Package size={16}/> أكثر المنتجات مبيعاً</div></div>
+          <div className="rep-card-head"><div className="rep-card-title"><Package size={16}/> {t('أكثر المنتجات مبيعاً')}</div></div>
           <div className="top-products-list">
             {stats.top_products_parsed?.length ? stats.top_products_parsed.map((p, i) => (
               <div key={i} className="prod-row">
@@ -273,21 +275,21 @@ export default function Reports() {
                   <div className="prod-progress-fill"
                        style={{ width: `${(p.value / stats.top_products_parsed[0].value) * 100}%`, background: COLORS[i % COLORS.length] }} />
                 </div>
-                <span className="prod-count">{p.value} قطعة</span>
+                <span className="prod-count">{p.value} {t('قطعة')}</span>
               </div>
-            )) : <div style={{ opacity:.5, padding:30, textAlign:'center' }}>لا توجد بيانات بعد</div>}
+            )) : <div style={{ opacity:.5, padding:30, textAlign:'center' }}>{t('لا يوجد بيانات بعد')}</div>}
           </div>
         </div>
 
         <div className="card rep-card">
-          <div className="rep-card-head"><div className="rep-card-title">ملخص الأداء</div></div>
+          <div className="rep-card-head"><div className="rep-card-title">{t('ملخص الأداء')}</div></div>
           <div style={{ padding:'4px 6px' }}>
-            <SummaryRow label="إيرادات اليوم" value={`${Number(stats.revenue_today||0).toLocaleString()} ${currency}`} accent="#2BB24C" />
-            <SummaryRow label="إيرادات قيد التحصيل" value={`${Number(stats.revenue_pending||0).toLocaleString()} ${currency}`} hint="طلبات لم تُسلَّم بعد" accent="#f59e0b" />
-            <SummaryRow label="طلبات اليوم" value={stats.orders_today || 0} />
-            <SummaryRow label="رسائل اليوم" value={stats.messages_today || 0} />
-            <SummaryRow label="المحادثات النشطة" value={stats.active_conversations || 0} />
-            <SummaryRow label="معدل الإتمام" value={`${completionRate}%`} hint="مُسلَّم ÷ إجمالي" />
+            <SummaryRow label={t('إيرادات اليوم')} value={`${Number(stats.revenue_today||0).toLocaleString()} ${currency}`} accent="#2BB24C" />
+            <SummaryRow label={t('إيرادات قيد التحصيل')} value={`${Number(stats.revenue_pending||0).toLocaleString()} ${currency}`} hint={t('طلبات لم تُسلَّم بعد')} accent="#f59e0b" />
+            <SummaryRow label={t('طلبات اليوم')} value={stats.orders_today || 0} />
+            <SummaryRow label={t('رسائل اليوم')} value={stats.messages_today || 0} />
+            <SummaryRow label={t('المحادثات النشطة')} value={stats.active_conversations || 0} />
+            <SummaryRow label={t('معدل الإتمام')} value={`${completionRate}%`} hint={t('مُسلَّم ÷ إجمالي')} />
           </div>
         </div>
       </div>
