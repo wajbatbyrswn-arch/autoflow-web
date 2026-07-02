@@ -38,7 +38,14 @@ async function pollUser(user: any) {
     try { msgs = await nashir.unreadMessages(key, acc); }
     catch (e: any) { console.error('[poller dm fetch]', e?.message || e); continue; }
 
-    // Never react to our own outbound replies (Nashir stores them in the same inbox).
+    // Nashir stores OUR OWN outbound replies in the same inbox, flagged is_our_reply.
+    // We must not AI-reply to them — but we MUST mark them read, otherwise they sit in
+    // the unread list forever and every cycle refetches the same backlog (they never drain).
+    const ownReplies = msgs.filter((m: any) => m.is_our_reply);
+    for (const m of ownReplies) {
+      try { await nashir.markRead(key, m.id); }
+      catch (e: any) { console.error('[poller markRead own]', m.id, e?.message || e); }
+    }
     msgs = msgs.filter((m: any) => !m.is_our_reply);
     // Oldest → newest so conversation history builds in order.
     msgs.sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
