@@ -61,8 +61,8 @@ export default function Settings() {
     setNashirSaving(true)
     try {
       const res = await window.api?.nashir?.saveKey(nashirKeyInput.trim())
-      if (res?.success) { toast.success('تم حفظ المفتاح والتحقق منه ✓'); setNashirKeyInput(''); await loadNashir() }
-      else toast.error(res?.error || 'فشل الحفظ')
+      if (res?.success) { toast.success(t('تم حفظ المفتاح والتحقق منه ✓')); setNashirKeyInput(''); await loadNashir() }
+      else toast.error(res?.error || t('فشل الحفظ'))
     } catch (e) { toast.error(e.message) }
     setNashirSaving(false)
   }
@@ -113,9 +113,9 @@ export default function Settings() {
       if (res?.success) {
         setTgChats(res.chats || [])
         if (!res.chats?.length) {
-          toast('ما في قنوات بعد — أضف البوت كأدمن لقناتك ثم أرسل أي رسالة فيها، ثم اضغط تحديث.', { duration: 6000, icon: 'ℹ️' })
+          toast(t('ما في قنوات بعد — أضف البوت كأدمن لقناتك ثم أرسل أي رسالة فيها، ثم اضغط تحديث.'), { duration: 6000, icon: 'ℹ️' })
         } else {
-          toast.success(`تم جلب ${res.chats.length} قناة/جروب`)
+          toast.success(`${t('تم جلب')} ${res.chats.length} ${t('قناة/جروب')}`)
         }
       } else {
         toast.error(res?.error || 'فشل الجلب')
@@ -138,10 +138,10 @@ export default function Settings() {
       const res = await rpc('telegram:saveToken', { token: tgBotToken.trim() })
       if (res?.success) {
         setTgBotInfo(res.bot)
-        toast.success(`تم ربط البوت: @${res.bot?.username || 'unknown'}`)
+        toast.success(`${t('تم ربط البوت:')} @${res.bot?.username || 'unknown'}`)
         setTgBotToken('')
       } else {
-        toast.error(res?.error || 'فشل التحقق من التوكن')
+        toast.error(res?.error || t('فشل التحقق من التوكن'))
       }
     } catch (e) { toast.error(e.message) }
     setTgSaving(false)
@@ -150,15 +150,15 @@ export default function Settings() {
   async function saveTgChat() {
     try {
       await rpc('settings:setTelegramAdminChat', { chat_id: tgChatId.trim() })
-      toast.success('تم حفظ Chat ID')
+      toast.success(t('تم حفظ Chat ID'))
     } catch (e) { toast.error(e.message) }
   }
 
   async function testTg() {
     setTgTesting(true)
     const res = await rpc('telegram:sendTest').catch(e => ({ success: false, error: e.message }))
-    if (res?.success) toast.success('تم إرسال رسالة الاختبار ✓ — راجع القناة')
-    else toast.error(res?.error || 'فشل الإرسال')
+    if (res?.success) toast.success(t('تم إرسال رسالة الاختبار ✓ — راجع القناة'))
+    else toast.error(res?.error || t('فشل الإرسال'))
     setTgTesting(false)
   }
 
@@ -429,8 +429,8 @@ export default function Settings() {
     setIsSavingProfile(false)
     if (res?.success) {
       await refreshCurrency()
-      toast.success('تم حفظ الملف الشخصي ✓')
-    } else toast.error('فشل الحفظ')
+      toast.success(t('تم حفظ الملف الشخصي ✓'))
+    } else toast.error(t('فشل الحفظ'))
   }
 
   async function saveNotifSettings() {
@@ -490,26 +490,25 @@ export default function Settings() {
             <div className="card" style={{marginBottom:20, background:'linear-gradient(135deg, rgba(108,71,255,0.08), rgba(168,85,247,0.05))', border:'1px solid var(--accent)'}}>
               <div style={{display:'flex', alignItems:'center', gap:12, marginBottom:6}}>
                 <div style={{width:40, height:40, borderRadius:10, background:'var(--accent)', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:20}}>🔗</div>
-                <div className="card-title" style={{margin:0}}>كيف يتم ربط الحسابات؟</div>
+                <div className="card-title" style={{margin:0}}>{t('كيف يتم ربط الحسابات؟')}</div>
               </div>
               <p style={{fontSize:13, color:'var(--text-secondary)', lineHeight:1.8, margin:0}}>
-                لتسهيل التجربة عليك، <b>فريق AutoFlow يربط حساباتك</b> (فيسبوك، إنستغرام، واتساب) خلال 10 دقائق بعد التواصل معنا.
-                ما عليك سوى الضغط على زر <b>(تواصل لربط الحساب)</b> أدناه. أما <b>تلغرام</b> فيمكنك ربطه بنفسك بسهولة، أو يمكن للفريق ربطه لك.
+                {t('لتسهيل التجربة عليك، فريق AutoFlow يربط حساباتك (فيسبوك، إنستغرام، واتساب) خلال 10 دقائق بعد التواصل معنا. ما عليك سوى الضغط على زر (تواصل لربط الحساب) أدناه. أما تلغرام فيمكنك ربطه بنفسك بسهولة، أو يمكن للفريق ربطه لك.')}
               </p>
               <button className="btn btn-primary" style={{marginTop:14}} onClick={()=>nav('/contact')}>
-                تواصل معنا لربط الحسابات
+                {t('تواصل معنا لربط الحسابات')}
               </button>
             </div>
 
             <div className="card">
               <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6}}>
-                <div className="card-title" style={{margin:0}}>حالة الحسابات المربوطة</div>
+                <div className="card-title" style={{margin:0}}>{t('حالة الحسابات المربوطة')}</div>
                 <button className="btn btn-secondary btn-sm" onClick={loadNashir} disabled={nashirLoading} style={{fontSize:12}}>
-                  {nashirLoading ? '...' : '🔄 تحديث'}
+                  {nashirLoading ? '...' : '🔄 ' + t('تحديث')}
                 </button>
               </div>
               <p style={{fontSize:13,color:'var(--text-muted)',marginBottom:18}}>
-                سيظهر هنا تلقائياً أي حساب يربطه الفريق لك، أو تربطه بنفسك (تلغرام). اضغط تحديث بعد أن يُخبرك الفريق بإتمام الربط.
+                {t('سيظهر هنا تلقائياً أي حساب يربطه الفريق لك، أو تربطه بنفسك (تلغرام). اضغط تحديث بعد أن يُخبرك الفريق بإتمام الربط.')}
               </p>
 
               <div className="settings-grid">
@@ -531,7 +530,7 @@ export default function Settings() {
                         <div className="flex items-center gap-3">
                           <img src={pc.icon} className="platform-settings-img" />
                           <div>
-                            <div style={{fontWeight:700, fontSize:15}}>{pc.label}</div>
+                            <div style={{fontWeight:700, fontSize:15}}>{t(pc.label)}</div>
                             <div style={{fontSize:12, color:'var(--text-muted)'}}>{pc.sub}</div>
                           </div>
                         </div>
@@ -539,9 +538,9 @@ export default function Settings() {
                       <div className="divider" />
                       {connected ? (
                         <div style={{fontSize:13, color:'#34d399', marginBottom:12, lineHeight:1.7, display:'flex', flexDirection:'column', gap:4}}>
-                          <div style={{fontWeight:700}}>✓ تم الربط</div>
+                          <div style={{fontWeight:700}}>✓ {t('تم الربط')}</div>
                           {pc.key === 'telegram' ? (
-                            <div style={{fontSize:12, color:'var(--text-secondary)'}}>بوت تلغرام مفعّل</div>
+                            <div style={{fontSize:12, color:'var(--text-secondary)'}}>{t('بوت تلغرام مفعّل')}</div>
                           ) : (
                             accounts.map((a, i) => (
                               <div key={a.pageId || i} style={{fontSize:12, color:'var(--text-secondary)'}}>
@@ -552,18 +551,18 @@ export default function Settings() {
                         </div>
                       ) : pc.key === 'telegram' ? (
                         <div style={{fontSize:12, color:'var(--text-muted)', marginBottom:12}}>
-                          أدخل توكن البوت من <a href="https://t.me/BotFather" target="_blank" rel="noreferrer" style={{color:'var(--accent)'}}>@BotFather</a> أو اطلب من الفريق ربطه لك.
+                          {t('أدخل توكن البوت من')} <a href="https://t.me/BotFather" target="_blank" rel="noreferrer" style={{color:'var(--accent)'}}>@BotFather</a> {t('أو اطلب من الفريق ربطه لك.')}
                         </div>
                       ) : (
-                        <div style={{fontSize:12, color:'var(--text-muted)', marginBottom:12}}>لم يُربط بعد. تواصل معنا لربط الحساب خلال 10 دقائق.</div>
+                        <div style={{fontSize:12, color:'var(--text-muted)', marginBottom:12}}>{t('لم يُربط بعد. تواصل معنا لربط الحساب خلال 10 دقائق.')}</div>
                       )}
                       {pc.key === 'telegram' ? (
                         <button className="btn btn-primary btn-sm w-full" onClick={()=>setTab(3)}>
-                          {connected ? 'إدارة بوت تلغرام' : 'ربط بوت تلغرام'}
+                          {connected ? t('إدارة بوت تلغرام') : t('ربط بوت تلغرام')}
                         </button>
                       ) : (
                         <button className="btn btn-primary btn-sm w-full" onClick={()=>nav('/contact')}>
-                          {connected ? 'إدارة عبر الفريق' : 'تواصل لربط الحساب'}
+                          {connected ? t('إدارة عبر الفريق') : t('تواصل لربط الحساب')}
                         </button>
                       )}
                     </div>
@@ -580,18 +579,18 @@ export default function Settings() {
             {profile?.subscription_status === 'active' ? (
               <div className="card" style={{padding:30, maxWidth:520, textAlign:'center'}}>
                 <div style={{fontSize:48, marginBottom:10}}>✓</div>
-                <h2 style={{fontSize:22, fontWeight:800, marginBottom:10}}>اشتراكك مُفعّل</h2>
+                <h2 style={{fontSize:22, fontWeight:800, marginBottom:10}}>{t('اشتراكك مُفعّل')}</h2>
                 <p style={{color:'var(--text-secondary)', marginBottom:18}}>
-                  الخطة: <strong>{profile?.plan === 'basic' ? 'الخطة الشهرية' : profile?.plan}</strong>
+                  {t('الخطة')}: <strong>{profile?.plan === 'basic' ? t('الخطة الشهرية') : profile?.plan}</strong>
                   <br/>
                   {profile?.subscription_expires_at && (
-                    <>ينتهي بتاريخ <strong>{new Date(profile.subscription_expires_at).toLocaleDateString('ar-EG', { dateStyle:'long' })}</strong></>
+                    <>{t('ينتهي بتاريخ')} <strong>{new Date(profile.subscription_expires_at).toLocaleDateString(lang === 'en' ? 'en-GB' : 'ar-EG', { dateStyle:'long' })}</strong></>
                   )}
                 </p>
-                <button className="btn btn-secondary" onClick={()=>nav('/contact')}>تواصل للتجديد</button>
+                <button className="btn btn-secondary" onClick={()=>nav('/contact')}>{t('تواصل للتجديد')}</button>
               </div>
             ) : (
-              <Activate embedded onActivated={() => { refreshSub?.(); toast.success('تم التفعيل ✓') }} />
+              <Activate embedded onActivated={() => { refreshSub?.(); toast.success(t('تم التفعيل ✓')) }} />
             )}
           </div>
         )}
@@ -599,43 +598,43 @@ export default function Settings() {
         {/* ── Tab 1: Profile ── */}
         {tab === 1 && (
           <div className="card animate-fade profile-settings">
-            <div className="card-title">تخصيص المتجر</div>
+            <div className="card-title">{t('تخصيص المتجر')}</div>
             <div className="profile-edit-layout">
               <div className="logo-upload-section">
                 <div className="current-logo-preview">
-                  {storeLogo ? <img src={storeLogo} alt="Preview" /> : <div className="no-logo-msg"><p>لا يوجد شعار</p></div>}
+                  {storeLogo ? <img src={storeLogo} alt="Preview" /> : <div className="no-logo-msg"><p>{t('لا يوجد شعار')}</p></div>}
                 </div>
                 <div className="input-group">
-                  <label className="input-label">شعار المتجر</label>
+                  <label className="input-label">{t('شعار المتجر')}</label>
                   <input type="file" accept="image/*" style={{ display: 'none' }} id="logo-file-input"
                     onChange={async e => {
                       const f = e.target.files?.[0]; if (!f) return
                       try {
                         const compressed = await compressImage(f, { maxDim: 400, quality: 0.85 })
                         setStoreLogo(compressed)
-                      } catch { toast.error('فشل ضغط الصورة') }
+                      } catch { toast.error(t('فشل ضغط الصورة')) }
                     }} />
                   <div className="flex gap-2">
                     <button type="button" className="btn btn-secondary btn-sm" onClick={() => document.getElementById('logo-file-input').click()}>
-                      📷 اختر صورة من الجهاز
+                      📷 {t('اختر صورة من الجهاز')}
                     </button>
-                    {storeLogo && <button type="button" className="btn btn-danger btn-sm" onClick={() => setStoreLogo('')}>✕ حذف</button>}
+                    {storeLogo && <button type="button" className="btn btn-danger btn-sm" onClick={() => setStoreLogo('')}>✕ {t('حذف')}</button>}
                   </div>
                 </div>
               </div>
               <div className="info-edit-section">
                 <div className="input-group">
-                  <label className="input-label">اسم المتجر</label>
-                  <input className="input" value={storeName} onChange={e=>setStoreName(e.target.value)} placeholder="متجري" />
+                  <label className="input-label">{t('اسم المتجر')}</label>
+                  <input className="input" value={storeName} onChange={e=>setStoreName(e.target.value)} placeholder={t('متجري')} />
                 </div>
                 <div className="input-group">
-                  <label className="input-label">العملة</label>
+                  <label className="input-label">{t('العملة')}</label>
                   <select className="input" value={currency} onChange={e=>setCurrency(e.target.value)}>
                     {CURRENCIES.map(c => <option key={c.v} value={c.v}>{c.l}</option>)}
                   </select>
                 </div>
                 <button className="btn btn-primary flex-center" onClick={saveProfile} disabled={isSavingProfile}>
-                  <img src={saveIcon} className="btn-img-icon" /> {isSavingProfile ? 'جارٍ الحفظ...' : 'حفظ التغييرات'}
+                  <img src={saveIcon} className="btn-img-icon" /> {isSavingProfile ? t('جارٍ الحفظ...') : t('حفظ التغييرات')}
                 </button>
               </div>
             </div>
@@ -649,8 +648,8 @@ export default function Settings() {
               <div style={{display:'flex', alignItems:'center', gap:12, marginBottom:8}}>
                 <div style={{width:42, height:42, borderRadius:10, background:'#229ED9', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:20}}>✈</div>
                 <div>
-                  <div className="card-title" style={{margin:0}}>بوت تلغرام للإشعارات</div>
-                  <div style={{fontSize:12, color:'var(--text-muted)'}}>اربط بوت تلغرام لاستقبال إشعارات الطلبات الجديدة والشكاوى في قناة/جروب خاص بك.</div>
+                  <div className="card-title" style={{margin:0}}>{t('بوت تلغرام للإشعارات')}</div>
+                  <div style={{fontSize:12, color:'var(--text-muted)'}}>{t('اربط بوت تلغرام لاستقبال إشعارات الطلبات الجديدة والشكاوى في قناة/جروب خاص بك.')}</div>
                 </div>
               </div>
 
@@ -659,30 +658,30 @@ export default function Settings() {
                   <div style={{display:'flex', alignItems:'center', gap:10, fontSize:13}}>
                     <span style={{color:'#34d399', fontSize:18}}>✓</span>
                     <div>
-                      <div style={{fontWeight:700}}>البوت مربوط: <span style={{color:'#34d399'}}>@{tgBotInfo.username}</span></div>
+                      <div style={{fontWeight:700}}>{t('البوت مربوط:')} <span style={{color:'#34d399'}}>@{tgBotInfo.username}</span></div>
                       <div style={{fontSize:11, color:'var(--text-muted)'}}>{tgBotInfo.first_name}</div>
                     </div>
                   </div>
                   <button className="btn btn-secondary btn-sm" onClick={async () => {
-                    if (!confirm('فصل البوت؟')) return
+                    if (!confirm(t('فصل البوت؟'))) return
                     await rpc('telegram:saveToken', { token: '' })
-                    setTgBotInfo(null); toast.success('تم الفصل')
-                  }}>فصل البوت</button>
+                    setTgBotInfo(null); toast.success(t('تم الفصل'))
+                  }}>{t('فصل البوت')}</button>
                 </div>
               ) : (
                 <>
                   <div className="input-group" style={{marginTop:14}}>
-                    <label className="input-label">1. توكن البوت (من @BotFather)</label>
+                    <label className="input-label">{t('1. توكن البوت (من @BotFather)')}</label>
                     <div style={{display:'flex', gap:6}}>
                       <input className="input" dir="ltr" style={{flex:1, fontFamily:'monospace'}}
                         placeholder="123456789:AAAAAAAA..." value={tgBotToken}
                         onChange={e => setTgBotToken(e.target.value)} />
                       <button className="btn btn-primary" onClick={saveTgToken} disabled={tgSaving || !tgBotToken.trim()}>
-                        {tgSaving ? '...' : 'حفظ وتحقق'}
+                        {tgSaving ? '...' : t('حفظ وتحقق')}
                       </button>
                     </div>
                     <div className="input-hint">
-                      أنشئ بوت جديد من <a href="https://t.me/BotFather" target="_blank" rel="noreferrer" style={{color:'var(--accent)'}}>@BotFather</a> ثم انسخ التوكن هنا.
+                      {t('أنشئ بوت جديد من')} <a href="https://t.me/BotFather" target="_blank" rel="noreferrer" style={{color:'var(--accent)'}}>@BotFather</a> {t('ثم انسخ التوكن هنا.')}
                     </div>
                   </div>
                 </>
@@ -691,30 +690,30 @@ export default function Settings() {
               {/* Chat selector — required for sending */}
               {tgBotInfo && (
                 <div className="input-group" style={{marginTop:14}}>
-                  <label className="input-label">2. اختر القناة/الجروب الذي ستصل عليه الإشعارات</label>
+                  <label className="input-label">{t('2. اختر القناة/الجروب الذي ستصل عليه الإشعارات')}</label>
 
                   <div style={{background:'rgba(34,158,217,0.07)', border:'1px dashed rgba(34,158,217,0.3)', borderRadius:10, padding:'10px 14px', fontSize:12, lineHeight:1.9, marginBottom:10, color:'var(--text-secondary)'}}>
-                    <strong style={{color:'var(--text)'}}>كيف تربط قناتك؟</strong><br/>
-                    1) افتح قناتك/جروبك على تلغرام.<br/>
-                    2) أضف البوت <strong style={{color:'#34d399'}}>@{tgBotInfo.username}</strong> كأدمن.<br/>
-                    3) أرسل أي رسالة (مثل "مرحبا") داخل القناة.<br/>
-                    4) اضغط زر "تحديث القنوات" أدناه.
+                    <strong style={{color:'var(--text)'}}>{t('كيف تربط قناتك؟')}</strong><br/>
+                    {t('1) افتح قناتك/جروبك على تلغرام.')}<br/>
+                    {t('2) أضف البوت')} <strong style={{color:'#34d399'}}>@{tgBotInfo.username}</strong> {t('كأدمن.')}<br/>
+                    {t('3) أرسل أي رسالة (مثل "مرحبا") داخل القناة.')}<br/>
+                    {t('4) اضغط زر "تحديث القنوات" أدناه.')}
                   </div>
 
                   <div style={{display:'flex', gap:6, marginBottom:10}}>
                     <button className="btn btn-secondary" style={{flex:1}} onClick={fetchTgChats} disabled={tgFetchingChats}>
-                      {tgFetchingChats ? 'جارٍ الجلب...' : '🔄 تحديث قائمة القنوات'}
+                      {tgFetchingChats ? t('جارٍ الجلب...') : '🔄 ' + t('تحديث قائمة القنوات')}
                     </button>
                   </div>
 
                   {tgChats.length > 0 ? (
                     <>
                       <select className="input" value={tgChatId} onChange={e => setTgChatId(e.target.value)} style={{marginBottom:8}}>
-                        <option value="">— اختر قناة أو جروب —</option>
+                        <option value="">— {t('اختر قناة أو جروب')} —</option>
                         {tgChats.map(c => {
-                          const typeLabel = c.type === 'channel' ? '📢 قناة'
-                            : c.type === 'group' || c.type === 'supergroup' ? '👥 جروب'
-                            : c.type === 'private' ? '👤 خاص' : c.type
+                          const typeLabel = c.type === 'channel' ? '📢 ' + t('قناة')
+                            : c.type === 'group' || c.type === 'supergroup' ? '👥 ' + t('جروب')
+                            : c.type === 'private' ? '👤 ' + t('خاص') : c.type
                           return (
                             <option key={c.id} value={c.id}>
                               {typeLabel} — {c.title}{c.username ? ` (@${c.username})` : ''}
@@ -723,18 +722,18 @@ export default function Settings() {
                         })}
                       </select>
                       <button className="btn btn-primary" style={{width:'100%'}} onClick={saveTgChat} disabled={!tgChatId}>
-                        💾 حفظ الاختيار
+                        💾 {t('حفظ الاختيار')}
                       </button>
                     </>
                   ) : (
                     <div style={{textAlign:'center', padding:'14px', opacity:0.6, fontSize:13, background:'var(--glass-bg)', borderRadius:10, border:'1px dashed var(--border-color)'}}>
-                      لا توجد قنوات بعد. اتبع الخطوات أعلاه ثم اضغط "تحديث".
+                      {t('لا توجد قنوات بعد. اتبع الخطوات أعلاه ثم اضغط "تحديث".')}
                     </div>
                   )}
 
                   {tgChatId && (
                     <div style={{marginTop:10, fontSize:11, opacity:0.6, fontFamily:'monospace', direction:'ltr', textAlign:'right'}}>
-                      Chat ID المحفوظ: {tgChatId}
+                      {t('Chat ID المحفوظ:')} {tgChatId}
                     </div>
                   )}
                 </div>
@@ -743,12 +742,12 @@ export default function Settings() {
               {/* Test button */}
               {tgBotInfo && tgChatId && (
                 <button className="btn btn-secondary" style={{marginTop:14, width:'100%'}} onClick={testTg} disabled={tgTesting}>
-                  {tgTesting ? 'جارٍ الإرسال...' : '🧪 إرسال رسالة اختبار'}
+                  {tgTesting ? t('جارٍ الإرسال...') : '🧪 ' + t('إرسال رسالة اختبار')}
                 </button>
               )}
 
               <div style={{marginTop:14, fontSize:12, color:'var(--text-muted)', borderTop:'1px dashed var(--border-color)', paddingTop:12}}>
-                💡 بعد الربط: أي طلب جديد أو شكوى ستظهر تلقائياً في القناة مع رابط مباشر للمحادثة على الموقع.
+                💡 {t('بعد الربط: أي طلب جديد أو شكوى ستظهر تلقائياً في القناة مع رابط مباشر للمحادثة على الموقع.')}
               </div>
             </div>
 
