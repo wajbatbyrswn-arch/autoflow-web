@@ -5,8 +5,10 @@ import toast from 'react-hot-toast'
 import { analyzeProductImage, fileToBase64 } from '../../utils/analyzeProduct'
 import { generatePostText } from '../../utils/generateText'
 import { generatePostImage } from '../../utils/generateImage'
+import { useT } from '../../lib/i18n'
 
 export default function PostGenerator() {
+  const { t } = useT()
   const navigate = useNavigate()
   const fileInputRef = useRef(null)
   
@@ -40,7 +42,7 @@ export default function PostGenerator() {
         if (themes && themes.length > 0) {
           setTheme(themes[0])
         } else {
-          toast('يرجى إعداد الهوية البصرية أولاً', { icon: '⚠️' })
+          toast(t('يرجى إعداد الهوية البصرية أولاً'), { icon: '⚠️' })
           navigate('/post-generator/setup')
         }
       } catch (e) {
@@ -68,9 +70,9 @@ export default function PostGenerator() {
         description: analysis.description || prev.description,
         features: analysis.features || prev.features
       }))
-      toast.success('تم تحليل الصورة بنجاح')
+      toast.success(t('تم تحليل الصورة بنجاح'))
     } catch (error) {
-      toast.error('فشل تحليل الصورة، يمكنك إدخال البيانات يدوياً')
+      toast.error(t('فشل تحليل الصورة، يمكنك إدخال البيانات يدوياً'))
     } finally {
       setLoading(false)
     }
@@ -78,15 +80,15 @@ export default function PostGenerator() {
 
   const handleGenerate = async () => {
     if (!imageBase64 && !productData.name) {
-      return toast.error('يرجى رفع صورة المنتج أو إدخال اسمه على الأقل')
+      return toast.error(t('يرجى رفع صورة المنتج أو إدخال اسمه على الأقل'))
     }
     if (!productData.price) {
-      return toast.error('يرجى إدخال السعر لتوليد صورة صحيحة')
+      return toast.error(t('يرجى إدخال السعر لتوليد صورة صحيحة'))
     }
-    
+
     setGenerating(true)
     try {
-      toast.success('جاري تخيل ورسم المشهد بالذكاء الاصطناعي (قد يستغرق بعض الوقت)...', { icon: '🎨' })
+      toast.success(t('جاري تخيل ورسم المشهد بالذكاء الاصطناعي (قد يستغرق بعض الوقت)...'), { icon: '🎨' })
       
       // 1. Generate AI Background
       const prompt = `Professional product photography of: ${productData.name || 'a product'}, ${productData.description || ''}. Beautiful, highly detailed, realistic. Studio lighting. Set in a premium environment matching the brand colors: ${theme.primary_color} and ${theme.secondary_color}. Do NOT include any text, letters, or numbers in the image.`
@@ -100,7 +102,7 @@ export default function PostGenerator() {
         isAiBackground = true
       } else {
         console.warn('AI Image Generation Failed:', aiRes?.error)
-        toast.error('فشل توليد صورة الذكاء الاصطناعي، سيتم استخدام التصميم البسيط')
+        toast.error(t('فشل توليد صورة الذكاء الاصطناعي، سيتم استخدام التصميم البسيط'))
       }
 
       // 2. Composite Image (Add Logo, Price, Frame)
@@ -126,10 +128,10 @@ export default function PostGenerator() {
         tone: postSettings.tone
       })
       
-      toast.success('تم توليد البوست بنجاح!')
+      toast.success(t('تم توليد البوست بنجاح!'))
     } catch (e) {
       console.error(e)
-      toast.error('حدث خطأ أثناء توليد البوست')
+      toast.error(t('حدث خطأ أثناء توليد البوست'))
     } finally {
       setGenerating(false)
     }
@@ -138,7 +140,7 @@ export default function PostGenerator() {
   const handleCopyText = () => {
     const fullText = generatedText + '\n\n' + generatedHashtags.map(h => `#${h.replace('#','')}`).join(' ')
     navigator.clipboard.writeText(fullText)
-    toast.success('تم نسخ نص البوست')
+    toast.success(t('تم نسخ نص البوست'))
   }
 
   const handleDownloadImage = () => {
@@ -153,11 +155,11 @@ export default function PostGenerator() {
     <div className="pg-create animate-fade">
       <div className="page-header flex justify-between items-center">
         <div>
-          <h1>توليد بوست جديد <Sparkles className="inline-icon" size={24} color="var(--accent)" /></h1>
-          <p>أدخل بيانات المنتج أو ارفع صورته، وسيتكفل الذكاء الاصطناعي بالباقي</p>
+          <h1>{t('توليد بوست جديد')} <Sparkles className="inline-icon" size={24} color="var(--accent)" /></h1>
+          <p>{t('أدخل بيانات المنتج أو ارفع صورته، وسيتكفل الذكاء الاصطناعي بالباقي')}</p>
         </div>
         <button className="btn btn-secondary" onClick={() => navigate('/post-generator')}>
-          <ArrowRight size={18} /> رجوع
+          <ArrowRight size={18} /> {t('رجوع')}
         </button>
       </div>
 
@@ -166,17 +168,17 @@ export default function PostGenerator() {
         <div className="pg-inputs-col">
           {/* Step 1: Image */}
           <div className="card">
-            <h3 className="card-title">1. صورة المنتج</h3>
+            <h3 className="card-title">1. {t('صورة المنتج')}</h3>
             <div className="logo-upload-zone" onClick={() => fileInputRef.current?.click()} style={{ padding: '20px' }}>
               {imageBase64 ? (
                 <div className="uploaded-logo-preview">
                   <img src={"data:image/jpeg;base64," + imageBase64} alt="Product" style={{maxHeight: '100px'}} />
-                  <span className="text-sm text-accent">اضغط لتغيير الصورة</span>
+                  <span className="text-sm text-accent">{t('اضغط لتغيير الصورة')}</span>
                 </div>
               ) : (
                 <div className="upload-btn">
                   {loading ? <RefreshCcw size={24} className="animate-spin text-accent" /> : <Upload size={24} />}
-                  <span>{loading ? 'جاري تحليل الصورة...' : 'انقر لرفع صورة المنتج (سيتم تحليلها بالذكاء الاصطناعي)'}</span>
+                  <span>{loading ? t('جاري تحليل الصورة...') : t('انقر لرفع صورة المنتج (سيتم تحليلها بالذكاء الاصطناعي)')}</span>
                 </div>
               )}
               <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleImageUpload} />
@@ -185,67 +187,67 @@ export default function PostGenerator() {
 
           {/* Step 2: Product Data */}
           <div className="card">
-            <h3 className="card-title">2. تفاصيل المنتج</h3>
+            <h3 className="card-title">2. {t('تفاصيل المنتج')}</h3>
             <div className="grid-2">
               <div className="input-group">
-                <label className="input-label">اسم المنتج</label>
+                <label className="input-label">{t('اسم المنتج')}</label>
                 <input type="text" className="input" value={productData.name} onChange={e => setProductData({...productData, name: e.target.value})} />
               </div>
               <div className="input-group">
-                <label className="input-label">السعر الحالي</label>
-                <input type="text" className="input" value={productData.price} onChange={e => setProductData({...productData, price: e.target.value})} placeholder="مثال: 50,000 دينار" />
+                <label className="input-label">{t('السعر الحالي')}</label>
+                <input type="text" className="input" value={productData.price} onChange={e => setProductData({...productData, price: e.target.value})} placeholder={t('مثال: 50,000 دينار')} />
               </div>
             </div>
             <div className="input-group">
-              <label className="input-label">الوصف (مختصر)</label>
+              <label className="input-label">{t('الوصف (مختصر)')}</label>
               <textarea className="textarea" style={{minHeight: '60px'}} value={productData.description} onChange={e => setProductData({...productData, description: e.target.value})}></textarea>
             </div>
           </div>
 
           {/* Step 3: Post Settings */}
           <div className="card">
-            <h3 className="card-title">3. إعدادات البوست</h3>
+            <h3 className="card-title">3. {t('إعدادات البوست')}</h3>
             <div className="grid-2">
               <div className="input-group">
-                <label className="input-label">المنصة المستهدفة</label>
+                <label className="input-label">{t('المنصة المستهدفة')}</label>
                 <select className="select" value={postSettings.platform} onChange={e => setPostSettings({...postSettings, platform: e.target.value})}>
-                  <option value="Instagram">انستقرام</option>
-                  <option value="Facebook">فيسبوك</option>
-                  <option value="TikTok">تيك توك</option>
-                  <option value="Twitter">تويتر (X)</option>
+                  <option value="Instagram">{t('انستقرام')}</option>
+                  <option value="Facebook">{t('فيسبوك')}</option>
+                  <option value="TikTok">{t('تيك توك')}</option>
+                  <option value="Twitter">{t('تويتر (X)')}</option>
                 </select>
               </div>
               <div className="input-group">
-                <label className="input-label">النبرة التسويقية</label>
+                <label className="input-label">{t('النبرة التسويقية')}</label>
                 <select className="select" value={postSettings.tone} onChange={e => setPostSettings({...postSettings, tone: e.target.value})}>
-                  <option value="exciting">حماسي (جذب الانتباه)</option>
-                  <option value="elegant">راقي وفخم</option>
-                  <option value="friendly">ودي وقريب</option>
-                  <option value="urgent">عاجل (عرض محدود)</option>
+                  <option value="exciting">{t('حماسي (جذب الانتباه)')}</option>
+                  <option value="elegant">{t('راقي وفخم')}</option>
+                  <option value="friendly">{t('ودي وقريب')}</option>
+                  <option value="urgent">{t('عاجل (عرض محدود)')}</option>
                 </select>
               </div>
             </div>
-            
+
             <div className="input-group mt-2">
-              <label className="input-label">عناصر النص المراد تضمينها</label>
+              <label className="input-label">{t('عناصر النص المراد تضمينها')}</label>
               <div className="checkbox-group">
                 <label className="checkbox-label">
-                  <input type="checkbox" checked={postSettings.includeHook} onChange={e => setPostSettings({...postSettings, includeHook: e.target.checked})} /> جملة جذب (Hook)
+                  <input type="checkbox" checked={postSettings.includeHook} onChange={e => setPostSettings({...postSettings, includeHook: e.target.checked})} /> {t('جملة جذب (Hook)')}
                 </label>
                 <label className="checkbox-label">
-                  <input type="checkbox" checked={postSettings.includeDescription} onChange={e => setPostSettings({...postSettings, includeDescription: e.target.checked})} /> وصف مقنع
+                  <input type="checkbox" checked={postSettings.includeDescription} onChange={e => setPostSettings({...postSettings, includeDescription: e.target.checked})} /> {t('وصف مقنع')}
                 </label>
                 <label className="checkbox-label">
-                  <input type="checkbox" checked={postSettings.includePrice} onChange={e => setPostSettings({...postSettings, includePrice: e.target.checked})} /> السعر
+                  <input type="checkbox" checked={postSettings.includePrice} onChange={e => setPostSettings({...postSettings, includePrice: e.target.checked})} /> {t('السعر')}
                 </label>
                 <label className="checkbox-label">
-                  <input type="checkbox" checked={postSettings.includeScarcity} onChange={e => setPostSettings({...postSettings, includeScarcity: e.target.checked})} /> عبارة ندرة
+                  <input type="checkbox" checked={postSettings.includeScarcity} onChange={e => setPostSettings({...postSettings, includeScarcity: e.target.checked})} /> {t('عبارة ندرة')}
                 </label>
                 <label className="checkbox-label">
-                  <input type="checkbox" checked={postSettings.includeQuestion} onChange={e => setPostSettings({...postSettings, includeQuestion: e.target.checked})} /> سؤال تفاعلي
+                  <input type="checkbox" checked={postSettings.includeQuestion} onChange={e => setPostSettings({...postSettings, includeQuestion: e.target.checked})} /> {t('سؤال تفاعلي')}
                 </label>
                 <label className="checkbox-label">
-                  <input type="checkbox" checked={postSettings.includeCTA} onChange={e => setPostSettings({...postSettings, includeCTA: e.target.checked})} /> رابط تواصل
+                  <input type="checkbox" checked={postSettings.includeCTA} onChange={e => setPostSettings({...postSettings, includeCTA: e.target.checked})} /> {t('رابط تواصل')}
                 </label>
               </div>
             </div>
@@ -253,7 +255,7 @@ export default function PostGenerator() {
 
           <button className="btn btn-primary w-full" style={{padding: '16px', fontSize: '16px'}} onClick={handleGenerate} disabled={generating || loading}>
             {generating ? <RefreshCcw className="animate-spin" size={20} /> : <Sparkles size={20} />}
-            {generating ? 'جاري التصميم وكتابة المحتوى...' : 'توليد البوست الآن'}
+            {generating ? t('جاري التصميم وكتابة المحتوى...') : t('توليد البوست الآن')}
           </button>
         </div>
 
@@ -262,17 +264,17 @@ export default function PostGenerator() {
           {generating && (
             <div className="pg-overlay-loading rounded-xl z-20">
               <RefreshCcw className="animate-spin" size={48} color="var(--accent)" />
-              <h3 className="mt-4">الذكاء الاصطناعي يعمل...</h3>
-              <p className="text-muted">جاري تصميم الصورة وكتابة المحتوى</p>
+              <h3 className="mt-4">{t('الذكاء الاصطناعي يعمل...')}</h3>
+              <p className="text-muted">{t('جاري تصميم الصورة وكتابة المحتوى')}</p>
             </div>
           )}
-          
+
           <div className="tabs w-full">
             <button className={"tab flex-1 " + (activeTab === 'image' ? 'active' : '')} onClick={() => setActiveTab('image')}>
-              التصميم
+              {t('التصميم')}
             </button>
             <button className={"tab flex-1 " + (activeTab === 'text' ? 'active' : '')} onClick={() => setActiveTab('text')}>
-              النص المكتوب
+              {t('النص المكتوب')}
             </button>
           </div>
 
@@ -284,13 +286,13 @@ export default function PostGenerator() {
                     <img src={generatedImageUrl} alt="Generated Post" />
                   </div>
                   <button className="btn btn-success mt-4 w-full" onClick={handleDownloadImage}>
-                    <Download size={18} /> حفظ الصورة
+                    <Download size={18} /> {t('حفظ الصورة')}
                   </button>
                 </>
               ) : (
                 <div className="empty-state">
                   <Sparkles size={48} className="icon" />
-                  <p>الصورة المولّدة ستظهر هنا</p>
+                  <p>{t('الصورة المولّدة ستظهر هنا')}</p>
                 </div>
               )}
             </div>
@@ -306,13 +308,13 @@ export default function PostGenerator() {
                     onChange={(e) => setGeneratedText(e.target.value)}
                   />
                   <button className="btn btn-primary mt-4 w-full" onClick={handleCopyText}>
-                    <Copy size={18} /> نسخ النص بالكامل
+                    <Copy size={18} /> {t('نسخ النص بالكامل')}
                   </button>
                 </>
               ) : (
                 <div className="empty-state flex-1">
                   <Sparkles size={48} className="icon" />
-                  <p>النص المولّد سيظهر هنا</p>
+                  <p>{t('النص المولّد سيظهر هنا')}</p>
                 </div>
               )}
             </div>
