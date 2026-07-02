@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { rpc } from '../lib/apiClient'
+import { useT } from '../lib/i18n'
 
 const WHATSAPP_LINK = 'https://wa.me/962770748793'
 const FACEBOOK_LINK = 'https://www.facebook.com/profile.php?id=61585073873212&locale=ar_AR'
 const INSTAGRAM_LINK = 'https://www.instagram.com/auto_flowran/'
 
 export default function Activate({ onActivated, embedded = false }) {
+  const { t } = useT()
   const [code, setCode] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -18,7 +20,7 @@ export default function Activate({ onActivated, embedded = false }) {
       const result = await rpc('activation:activate', { code: code.trim() })
       if (result?.success) onActivated?.()
     } catch (err) {
-      setError(err.message || 'كود غير صحيح')
+      setError(err.message || t('كود غير صحيح'))
     }
     setLoading(false)
   }
@@ -30,19 +32,19 @@ export default function Activate({ onActivated, embedded = false }) {
 
   const body = (
     <div style={styles.card}>
-      <h1 style={styles.title}>تنشيط الحساب</h1>
+      <h1 style={styles.title}>{t('تنشيط الحساب')}</h1>
       <p style={styles.sub}>
-        لتنشيط الحساب يجب وضع الكود.
+        {t('لتنشيط الحساب يجب وضع الكود.')}
         <br/>
         <span style={{fontSize:12, opacity:.85}}>
-          تواصل معنا لتنشيط الحساب حسب الخطة المختارة.
+          {t('تواصل معنا لتنشيط الحساب حسب الخطة المختارة.')}
         </span>
       </p>
       <form onSubmit={activate} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 14 }}>
         <input
           value={code}
           onChange={e => setCode(e.target.value)}
-          placeholder="ادخل كود التفعيل (20 رمز)"
+          placeholder={t('ادخل كود التفعيل (20 رمز)')}
           maxLength={24}
           dir="ltr"
           style={styles.input}
@@ -50,24 +52,24 @@ export default function Activate({ onActivated, embedded = false }) {
         />
         {error && <p style={styles.err}>{error}</p>}
         <button type="submit" disabled={loading || code.length < 8} style={styles.btn}>
-          {loading ? 'جارٍ التفعيل...' : 'تفعيل'}
+          {loading ? t('جارٍ التفعيل...') : t('تفعيل')}
         </button>
       </form>
 
-      <div style={styles.divider}>أو</div>
+      <div style={styles.divider}>{t('أو')}</div>
 
       <div style={{display:'flex', flexDirection:'column', gap:8, width:'100%'}}>
         <a href={WHATSAPP_LINK} target="_blank" rel="noreferrer" style={{...styles.contactBtn, background:'#25D366'}}>
-          تواصل عبر واتساب
+          {t('تواصل عبر واتساب')}
         </a>
         <div style={{display:'flex', gap:8}}>
-          <a href={FACEBOOK_LINK} target="_blank" rel="noreferrer" style={{...styles.contactBtn, background:'#1877F2', flex:1}}>فيسبوك</a>
-          <a href={INSTAGRAM_LINK} target="_blank" rel="noreferrer" style={{...styles.contactBtn, background:'#E4405F', flex:1}}>إنستغرام</a>
+          <a href={FACEBOOK_LINK} target="_blank" rel="noreferrer" style={{...styles.contactBtn, background:'#1877F2', flex:1}}>{t('فيسبوك')}</a>
+          <a href={INSTAGRAM_LINK} target="_blank" rel="noreferrer" style={{...styles.contactBtn, background:'#E4405F', flex:1}}>{t('إنستغرام')}</a>
         </div>
       </div>
 
       {!embedded && (
-        <button onClick={logout} style={styles.logout}>تسجيل الخروج</button>
+        <button onClick={logout} style={styles.logout}>{t('تسجيل الخروج')}</button>
       )}
     </div>
   )
