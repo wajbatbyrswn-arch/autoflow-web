@@ -1,6 +1,7 @@
 import whatsappIcon from '../../assets/icons/whatsapp.png'
 import facebookIcon from '../../assets/icons/facebook.png'
 import instagramIcon from '../../assets/icons/instagram.png'
+import { useT } from '../../lib/i18n'
 
 const WHATSAPP = '+962 7 7074 8793'
 const WHATSAPP_LINK = 'https://wa.me/962770748793'
@@ -14,19 +15,18 @@ const CHANNELS = [
 ]
 
 export default function Contact() {
+  const { t } = useT()
   return (
     <div className="animate-fade" style={{padding:24}}>
       <div className="page-header" style={{marginBottom:24}}>
-        <h1>تواصل معنا</h1>
-        <p>اختر الطريقة الأنسب لك وفريقنا سيرد عليك خلال دقائق</p>
+        <h1>{t('تواصل معنا')}</h1>
+        <p>{t('اختر الطريقة الأنسب لك وفريقنا سيرد عليك خلال دقائق')}</p>
       </div>
 
       <div className="card" style={{padding:28, marginBottom:20}}>
-        <h2 style={{fontSize:18, marginBottom:10, fontWeight:700}}>كيف نساعدك؟</h2>
+        <h2 style={{fontSize:18, marginBottom:10, fontWeight:700}}>{t('كيف نساعدك؟')}</h2>
         <p style={{color:'var(--text-secondary)', fontSize:14, lineHeight:1.8}}>
-          فريق AutoFlow يربط لك حسابات فيسبوك، إنستغرام، وواتساب بمنصتك خلال
-          <strong style={{color:'var(--accent)'}}> 10 دقائق </strong>
-          بعد دفع رسوم الاشتراك. كل ما عليك التواصل معنا عبر إحدى القنوات أدناه وتزويدنا بصلاحيات إدارية بسيطة على صفحتك، ونتولى الباقي.
+          {t('فريق AutoFlow يربط لك حسابات فيسبوك، إنستغرام، وواتساب بمنصتك خلال 10 دقائق بعد دفع رسوم الاشتراك. كل ما عليك التواصل معنا عبر إحدى القنوات أدناه وتزويدنا بصلاحيات إدارية بسيطة على صفحتك، ونتولى الباقي.')}
         </p>
       </div>
 
@@ -40,10 +40,10 @@ export default function Contact() {
             <div style={{width:70, height:70, borderRadius:'50%', background:c.color+'22', display:'flex', alignItems:'center', justifyContent:'center'}}>
               <img src={c.icon} alt={c.label} style={{width:42, height:42, objectFit:'contain'}} />
             </div>
-            <div style={{fontWeight:800, fontSize:16}}>{c.label}</div>
-            <div style={{fontSize:12, color:'var(--text-muted)', direction:'ltr'}}>{c.sub}</div>
+            <div style={{fontWeight:800, fontSize:16}}>{t(c.label)}</div>
+            <div style={{fontSize:12, color:'var(--text-muted)', direction:'ltr'}}>{c.sub === 'صفحتنا الرسمية' ? t('صفحتنا الرسمية') : c.sub}</div>
             <span style={{marginTop:6, padding:'8px 22px', borderRadius:10, background:c.color, color:'#fff', fontWeight:700, fontSize:13}}>
-              فتح المحادثة
+              {t('فتح المحادثة')}
             </span>
           </a>
         ))}
@@ -51,8 +51,8 @@ export default function Contact() {
 
       <div className="card" style={{padding:20, marginTop:24, background:'var(--glass-bg)', border:'1px dashed var(--border-color)'}}>
         <div style={{fontSize:13, color:'var(--text-secondary)', lineHeight:1.9}}>
-          <strong style={{color:'var(--text-primary)'}}>ساعات الدعم:</strong> يومياً من 9 صباحاً حتى 11 مساءً (بتوقيت الأردن).
-          <br/>الرد عبر واتساب عادةً خلال أقل من 30 دقيقة.
+          <strong style={{color:'var(--text-primary)'}}>{t('ساعات الدعم:')}</strong> {t('يومياً من 9 صباحاً حتى 11 مساءً (بتوقيت الأردن).')}
+          <br/>{t('الرد عبر واتساب عادةً خلال أقل من 30 دقيقة.')}
         </div>
       </div>
     </div>
