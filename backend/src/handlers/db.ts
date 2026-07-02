@@ -54,15 +54,24 @@ export const dbHandlers = {
 
   // ---- Conversations & messages ----
   'db:getConversations': async ({ userId }: Ctx, filters: any = {}) => {
-    let q = supabase.from('conversations').select('*').eq('user_id', userId);
+    // context_summary can be a large text blob (AI-generated history summary) that the
+    // inbox list never renders — exclude it here; it's loaded per-conversation instead.
+    const COLS = 'id,platform,sender_id,sender_name,sender_avatar,status,ai_enabled,ai_tag,nashir_account_id,last_message,last_message_at,created_at,ai_paused_until';
+    let q = supabase.from('conversations').select(COLS).eq('user_id', userId);
     if (filters?.status) q = q.eq('status', filters.status);
     if (filters?.platform) q = q.eq('platform', filters.platform);
-    const { data } = await q.order('last_message_at', { ascending: false });
+    const { data } = await q.order('last_message_at', { ascending: false }).limit(500);
     return data || [];
   },
   'db:getMessages': async ({ userId }: Ctx, convId: any) => {
-    const { data } = await supabase.from('messages').select('*').eq('user_id', userId).eq('conversation_id', convId).order('created_at', { ascending: true });
-    return data || [];
+    // Explicitly exclude raw_payload (large jsonb — the full Nashir payload per message).
+    // Selecting it was ~3x slower and 4.5x larger; the frontend never reads it.
+    // Cap at the most recent 300 messages (fetched newest-first, returned oldest-first).
+    const COLS = 'id,conversation_id,nashir_message_id,sender,content,message_type,ai_suggestion,created_at,nashir_reply_id';
+    const { data } = await supabase.from('messages').select(COLS)
+      .eq('user_id', userId).eq('conversation_id', convId)
+      .order('created_at', { ascending: false }).limit(300);
+    return (data || []).reverse();
   },
 
   // ---- Stats (dashboard) ----
@@ -78,8 +87,25 @@ export const dbHandlers = {
       return count || 0;
     };
 
-    const { data: orders30 } = await supabase.from('orders').select('total_amount,status,platform,products_json,created_at').eq('user_id', userId).gte('created_at', since30);
-    const all = orders30 || [];
+    // Fire every independent query in PARALLEL. Previously these ran sequentially
+    // (~7 round-trips one after another) which made the dashboard take several seconds.
+    const since60 = new Date(Date.now() - 60 * 864e5).toISOString();
+    const [
+      orders30Res,
+      prevOrdersRes,
+      messagesToday,
+      ordersTotal,
+      commentsToday,
+      activeConvs,
+    ] = await Promise.all([
+      supabase.from('orders').select('total_amount,status,platform,products_json,created_at').eq('user_id', userId).gte('created_at', since30),
+      supabase.from('orders').select('total_amount,status,created_at').eq('user_id', userId).gte('created_at', since60).lt('created_at', since30),
+      count('messages', q => q.gte('created_at', todayIso)),
+      count('orders'),
+      count('activity_log', q => q.gte('created_at', todayIso)),
+      count('conversations', q => q.eq('status', 'active')),
+    ]);
+    const all = orders30Res.data || [];
     // Revenue is counted ONLY after the order is delivered.
     const delivered = all.filter(o => o.status === 'delivered');
     const notCancelled = all.filter(o => o.status !== 'cancelled');
@@ -107,12 +133,8 @@ export const dbHandlers = {
       hourMap[h] = (hourMap[h] || 0) + 1;
     }
 
-    // Month-over-month deltas (current 30d vs previous 30d)
-    const since60 = new Date(Date.now() - 60 * 864e5).toISOString();
-    const { data: prevOrders } = await supabase.from('orders')
-      .select('total_amount,status,created_at')
-      .eq('user_id', userId).gte('created_at', since60).lt('created_at', since30);
-    const prev = prevOrders || [];
+    // Month-over-month deltas (current 30d vs previous 30d) — prev orders fetched in parallel above.
+    const prev = prevOrdersRes.data || [];
     const prevDelivered = prev.filter(o => o.status === 'delivered');
     const prevRevenue = prevDelivered.reduce((s, o) => s + (o.total_amount || 0), 0);
     const prevOrdersCount = prev.length;
@@ -120,11 +142,11 @@ export const dbHandlers = {
     const pct = (cur: number, p: number) => p === 0 ? (cur > 0 ? 100 : 0) : Math.round(((cur - p) / p) * 100);
 
     return {
-      messages_today: await count('messages', q => q.gte('created_at', todayIso)),
+      messages_today: messagesToday,
       orders_today: all.filter(o => isToday(o.created_at)).length,
-      orders_total: await count('orders'),
-      comments_today: await count('activity_log', q => q.gte('created_at', todayIso)),
-      active_conversations: await count('conversations', q => q.eq('status', 'active')),
+      orders_total: ordersTotal,
+      comments_today: commentsToday,
+      active_conversations: activeConvs,
       // Revenue = sum of delivered orders' total_amount only.
       revenue_today: delivered.filter(o => isToday(o.created_at)).reduce((s, o) => s + (o.total_amount || 0), 0),
       revenue_total: curRevenue,
