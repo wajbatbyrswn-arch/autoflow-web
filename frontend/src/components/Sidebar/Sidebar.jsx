@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { NavLink } from 'react-router-dom'
 import { play as playSound } from '../../lib/sounds'
+import { useT } from '../../lib/i18n'
 import { LayoutDashboard, MessageSquare, Bot, ReplyAll, MessageCircle, FileSpreadsheet, Receipt, LineChart, Bell, Settings, Database, History, Megaphone, CheckCircle, Sparkles, AlertOctagon } from 'lucide-react'
 import './Sidebar.css'
 import logoImg from '../../assets/logo.jpg'
@@ -34,14 +35,16 @@ const NAV_TOOLS = [
   { to: '/plans', icon: Sparkles, label: 'الخطط والأسعار', isImage: false },
 ]
 
-function planLabel(status, plan, expires) {
-  if (status === 'expired') return { txt: 'منتهي', cls: 'expired' }
-  if (status !== 'active') return { txt: 'غير مفعّل', cls: 'inactive' }
+function planLabel(status, plan, expires, t) {
+  if (status === 'expired') return { txt: t('منتهي'), cls: 'expired' }
+  if (status !== 'active') return { txt: t('غير مفعّل'), cls: 'inactive' }
   const days = expires ? Math.max(0, Math.ceil((new Date(expires) - new Date()) / 86400000)) : null
-  return { txt: `${plan === 'basic' ? 'الخطة الشهرية' : (plan || 'مفعّل')}${days != null ? ` — ${days} يوم` : ''}`, cls: 'active' }
+  const planTxt = plan === 'basic' ? t('الخطة الشهرية') : (plan || t('مفعّل'))
+  return { txt: `${planTxt}${days != null ? ` — ${days} ${t('يوم')}` : ''}`, cls: 'active' }
 }
 
 export default function Sidebar({ isAdmin, profile = null, isOpen = false, onClose = () => {} }) {
+  const { t } = useT()
   const [storeInfo, setStoreInfo] = useState({ store_name: 'AutoFlow', store_logo: '' })
   const [counts, setCounts] = useState({ unread: 0, complaints: 0 })
 
@@ -90,14 +93,14 @@ export default function Sidebar({ isAdmin, profile = null, isOpen = false, onClo
       // Close sidebar when a nav link is clicked on mobile
       if (e.target.closest('.nav-item')) onClose()
     }}>
-      <button className="sidebar-close-btn" onClick={onClose} aria-label="إغلاق القائمة">✕</button>
+      <button className="sidebar-close-btn" onClick={onClose} aria-label={t('إغلاق القائمة')}>✕</button>
       <div className="sidebar-logo">
         <div className="logo-img-container">
           <img src={storeInfo.store_logo || logoImg} alt="AutoFlow Logo" className="app-logo-img" />
         </div>
         <div className="logo-text">
           <span className="logo-name">{storeInfo.store_name}</span>
-          <span className="logo-sub">نظام الأتمتة الذكي</span>
+          <span className="logo-sub">{t('نظام الأتمتة الذكي')}</span>
         </div>
       </div>
 
@@ -110,13 +113,13 @@ export default function Sidebar({ isAdmin, profile = null, isOpen = false, onClo
               ) : (
                 <item.icon size={18} className="nav-icon" />
               )}
-              <span className="nav-label">{item.label}</span>
+              <span className="nav-label">{t(item.label)}</span>
             </NavLink>
           ))}
         </nav>
 
         <div className="nav-group">
-          <div className="nav-group-title">الأدوات</div>
+          <div className="nav-group-title">{t('الأدوات')}</div>
           <nav className="sidebar-nav">
             {NAV_TOOLS.map(item => {
               const liveCount = item.badgeKey ? counts[item.badgeKey] : 0
@@ -127,7 +130,7 @@ export default function Sidebar({ isAdmin, profile = null, isOpen = false, onClo
                   ) : (
                     <item.icon size={18} className="nav-icon" />
                   )}
-                  <span className="nav-label">{item.label}</span>
+                  <span className="nav-label">{t(item.label)}</span>
                   {item.badge && <span className="nav-badge">{item.badge}</span>}
                   {!!liveCount && <span className="nav-badge" style={{background:'#ef4444', color:'#fff'}}>{liveCount}</span>}
                 </NavLink>
@@ -138,15 +141,15 @@ export default function Sidebar({ isAdmin, profile = null, isOpen = false, onClo
 
         {isAdmin && (
           <div className="nav-group">
-            <div className="nav-group-title">الإدارة</div>
+            <div className="nav-group-title">{t('الإدارة')}</div>
             <nav className="sidebar-nav">
               <NavLink to="/admin" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
                 <Database size={18} className="nav-icon" />
-                <span className="nav-label">لوحة الإدارة</span>
+                <span className="nav-label">{t('لوحة الإدارة')}</span>
               </NavLink>
               <NavLink to="/ai-config" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
                 <img src={configIcon} alt="AI" className="nav-img-icon" />
-                <span className="nav-label">الذكاء الاصطناعي</span>
+                <span className="nav-label">{t('الذكاء الاصطناعي')}</span>
               </NavLink>
             </nav>
           </div>
@@ -168,11 +171,11 @@ export default function Sidebar({ isAdmin, profile = null, isOpen = false, onClo
               color: profile?.subscription_status === 'active' ? '#34d399'
                    : profile?.subscription_status === 'expired' ? '#f87171' : '#fbbf24'
             }}>
-              {planLabel(profile?.subscription_status, profile?.plan, profile?.subscription_expires_at).txt}
+              {planLabel(profile?.subscription_status, profile?.plan, profile?.subscription_expires_at, t).txt}
             </div>
             {profile?.subscription_status === 'active' && profile?.subscription_expires_at && (
               <div style={{fontSize:10, opacity:.55, marginTop:2}}>
-                ينتهي {new Date(profile.subscription_expires_at).toLocaleDateString('ar-EG', { day:'numeric', month:'short', year:'numeric' })}
+                {t('ينتهي')} {new Date(profile.subscription_expires_at).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' })}
               </div>
             )}
           </div>

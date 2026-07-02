@@ -3,9 +3,11 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import Landing from './auth/Landing'
 import Activate from './auth/Activate'
+import { useT } from './lib/i18n'
 import { installWebApi } from './lib/webApi'
 import { supabase } from './lib/supabaseClient'
 import { rpc } from './lib/apiClient'
+import { I18nProvider } from './lib/i18n'
 import './styles/globals.css'
 
 // Make window.api available before any page mounts.
@@ -20,6 +22,7 @@ function Screen({ children }) {
 }
 
 function Gate() {
+  const { t } = useT()
   const [session, setSession] = useState(undefined) // undefined = loading
   const [sub, setSub] = useState(null) // null = unknown, then status object
   const [subError, setSubError] = useState(false)
@@ -53,16 +56,16 @@ function Gate() {
     refreshStatus()
   }, [uid])
 
-  if (session === undefined) return <Screen>جارٍ التحميل...</Screen>
+  if (session === undefined) return <Screen>{t('جارٍ التحميل...')}</Screen>
   if (!session) return <Landing />
 
   if (subError) {
     return (
       <Screen>
-        <p>تعذّر الاتصال بالخادم</p>
+        <p>{t('تعذّر الاتصال بالخادم')}</p>
         <button onClick={refreshStatus}
           style={{ padding: '8px 20px', borderRadius: 10, border: 'none', background: 'var(--accent,#6C47FF)', color: '#fff', cursor: 'pointer', fontFamily: 'Cairo, sans-serif' }}>
-          إعادة المحاولة
+          {t('إعادة المحاولة')}
         </button>
       </Screen>
     )
@@ -70,10 +73,10 @@ function Gate() {
 
   if (sub === null) return (
     <Screen>
-      <p>جارٍ التحقق من الاشتراك...</p>
+      <p>{t('جارٍ التحقق من الاشتراك...')}</p>
       <button onClick={async () => { try { await supabase.auth.signOut() } catch {}; localStorage.clear(); location.reload() }}
         style={{ marginTop: 8, background: 'none', border: 'none', color: 'var(--text-secondary,#9aa0ac)', fontSize: 12, cursor: 'pointer', textDecoration: 'underline', fontFamily: 'Cairo, sans-serif' }}>
-        تأخّر التحميل؟ إعادة تعيين الجلسة
+        {t('تأخّر التحميل؟ إعادة تعيين الجلسة')}
       </button>
     </Screen>
   )
@@ -85,6 +88,8 @@ function Gate() {
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <Gate />
+    <I18nProvider>
+      <Gate />
+    </I18nProvider>
   </React.StrictMode>
 )

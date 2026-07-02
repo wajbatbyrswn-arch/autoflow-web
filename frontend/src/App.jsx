@@ -22,6 +22,7 @@ import { SubscriptionProvider } from './lib/subscription'
 import { ConfirmProvider } from './components/ConfirmDialog/ConfirmDialog'
 import { on } from './lib/events'
 import { play } from './lib/sounds'
+import { useT } from './lib/i18n'
 import './styles/globals.css'
 
 function PageLoader() {
@@ -33,16 +34,17 @@ function PageLoader() {
 }
 
 function InactiveBanner({ status }) {
+  const { t } = useT()
   const nav = useNavigate()
   const isExpired = status === 'expired'
   return (
     <div style={{background: isExpired ? '#7f1d1d' : 'linear-gradient(90deg,#6C47FF,#a855f7)', color:'#fff', padding:'10px 18px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, flexWrap:'wrap', fontSize:13}}>
       <div style={{fontWeight:600}}>
-        {isExpired ? '⚠ اشتراكك منتهي — جدّد للاستمرار' : 'حسابك غير مُفعّل بعد — يمكنك تصفّح المنصة فقط'}
+        {isExpired ? `⚠ ${t('اشتراكك منتهي — جدّد للاستمرار')}` : t('حسابك غير مُفعّل بعد — يمكنك تصفّح المنصة فقط')}
       </div>
       <div style={{display:'flex', gap:8}}>
-        <button onClick={()=>nav('/plans')} style={{background:'#fff', color:'#000', border:'none', borderRadius:8, padding:'6px 16px', fontWeight:800, cursor:'pointer'}}>اشترك</button>
-        <button onClick={()=>nav('/contact')} style={{background:'rgba(255,255,255,.2)', color:'#fff', border:'1px solid rgba(255,255,255,.4)', borderRadius:8, padding:'6px 14px', fontWeight:600, cursor:'pointer'}}>تواصل معنا</button>
+        <button onClick={()=>nav('/plans')} style={{background:'#fff', color:'#000', border:'none', borderRadius:8, padding:'6px 16px', fontWeight:800, cursor:'pointer'}}>{t('اشترك')}</button>
+        <button onClick={()=>nav('/contact')} style={{background:'rgba(255,255,255,.2)', color:'#fff', border:'1px solid rgba(255,255,255,.4)', borderRadius:8, padding:'6px 14px', fontWeight:600, cursor:'pointer'}}>{t('تواصل معنا')}</button>
       </div>
     </div>
   )

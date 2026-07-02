@@ -15,6 +15,7 @@ import { refreshCurrency } from '../../lib/useCurrency'
 import { useSubscription } from '../../lib/subscription'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { rpc } from '../../lib/apiClient'
+import { useT } from '../../lib/i18n'
 import Activate from '../../auth/Activate'
 import './Settings.css'
 
@@ -34,6 +35,7 @@ const PLATFORM_CARDS = [
 ]
 
 export default function Settings() {
+  const { t, lang, setLang } = useT()
   const nav = useNavigate()
   const [searchParams] = useSearchParams()
   const { profile, refresh: refreshSub } = useSubscription()
@@ -452,15 +454,30 @@ export default function Settings() {
   return (
     <div className="animate-fade">
       <div className="page-header">
-        <h1>الإعدادات</h1>
-        <p>ربط المنصات وإدارة خيارات التطبيق</p>
+        <h1>{t('الإعدادات')}</h1>
+        <p>{t('ربط المنصات وإدارة خيارات التطبيق')}</p>
+      </div>
+
+      {/* Interface language switch (flips the whole app RTL/LTR) */}
+      <div className="card" style={{marginBottom:16, display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, flexWrap:'wrap'}}>
+        <div style={{display:'flex', alignItems:'center', gap:10}}>
+          <img src={globeIcon} style={{width:28, height:28}} />
+          <div>
+            <div className="card-title" style={{margin:0}}>{t('لغة الواجهة')}</div>
+            <div style={{fontSize:12, color:'var(--text-muted)'}}>{t('اختر لغة عرض التطبيق')}</div>
+          </div>
+        </div>
+        <div style={{display:'flex', gap:8}}>
+          <button className={`btn btn-sm ${lang === 'ar' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setLang('ar')}>العربية</button>
+          <button className={`btn btn-sm ${lang === 'en' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setLang('en')}>English</button>
+        </div>
       </div>
 
       <div className="settings-tabs">
-        {TABS.map(t => (
-          <button key={t.id} className={`s-tab ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>
-            <img src={t.icon} className="tab-img-icon" />
-            <span>{t.label}</span>
+        {TABS.map(tb => (
+          <button key={tb.id} className={`s-tab ${tab === tb.id ? 'active' : ''}`} onClick={() => setTab(tb.id)}>
+            <img src={tb.icon} className="tab-img-icon" />
+            <span>{t(tb.label)}</span>
           </button>
         ))}
       </div>
