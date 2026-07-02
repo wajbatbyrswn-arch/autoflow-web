@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Facebook, Instagram, Phone, Bot, MessageSquare, ShoppingCart, MessageCircle, DollarSign, CheckCircle, AlertTriangle, Info, PlusCircle, LayoutList, Megaphone, FileText, RefreshCw, BarChart2, PieChart as PieChartIcon, Clock, Settings, Bell, AlertOctagon } from 'lucide-react'
 import { useSubscription } from '../../lib/subscription'
+import { useT } from '../../lib/i18n'
 import { BarChart, Bar, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import './Dashboard.css'
 
@@ -19,6 +20,7 @@ import ordersIcon from '../../assets/icons/orders.png'
 
 export default function Dashboard() {
   const navigate = useNavigate()
+  const { t, lang } = useT()
   const { profile } = useSubscription()
   const [stats, setStats] = useState({ messages_today: 0, orders_today: 0, comments_today: 0, revenue_today: 0 })
   // Platform status derived from real linked data (Nashir accounts + telegram bot token).
@@ -71,7 +73,7 @@ export default function Dashboard() {
   const monthOrders = (stats.orders_by_day || []).filter(d => new Date(d.day) >= now30).reduce((a,d) => a + d.count, 0)
   // Most active platform
   const topPlatform = pieData.length > 0 ? pieData.reduce((a,b) => b.value > a.value ? b : a, pieData[0]) : null
-  const platformLabel = { whatsapp:'واتساب', facebook:'فيسبوك', instagram:'إنستغرام', telegram:'تلغرام' }
+  const platformLabel = { whatsapp:t('واتساب'), facebook:t('فيسبوك'), instagram:t('إنستغرام'), telegram:t('تلغرام') }
 
   return (
     <div className="dashboard-container animate-fade">
@@ -81,9 +83,9 @@ export default function Dashboard() {
           <div className="platform-info">
             <div className="p-img-container"><img src={whatsappIcon} alt="WhatsApp" className="p-img" /></div>
             <div className="p-details">
-              <span className="p-name">واتساب</span>
+              <span className="p-name">{t('واتساب')}</span>
               <span className={`p-status ${waStatus === 'connected' ? 'online' : 'offline'}`}>
-                <span className="dot"></span> {waStatus === 'connected' ? 'متصل' : 'منقطع'}
+                <span className="dot"></span> {waStatus === 'connected' ? t('متصل') : t('منقطع')}
               </span>
             </div>
             <div className="wifi-icon"><div className={`w-signal ${waStatus === 'connected' ? 'active' : ''}`}></div></div>
@@ -95,9 +97,9 @@ export default function Dashboard() {
           <div className="platform-info">
             <div className="p-img-container"><img src={telegramIcon} alt="Telegram" className="p-img" /></div>
             <div className="p-details">
-              <span className="p-name">تلغرام</span>
+              <span className="p-name">{t('تلغرام')}</span>
               <span className={`p-status ${tgStatus === 'connected' ? 'online' : 'offline'}`}>
-                <span className="dot"></span> {tgStatus === 'connected' ? 'متصل' : 'منقطع'}
+                <span className="dot"></span> {tgStatus === 'connected' ? t('متصل') : t('منقطع')}
               </span>
             </div>
             <div className="wifi-icon"><div className={`w-signal ${tgStatus === 'connected' ? 'active' : ''}`}></div></div>
@@ -109,9 +111,9 @@ export default function Dashboard() {
           <div className="platform-info">
             <div className="p-img-container"><img src={facebookIcon} alt="Facebook" className="p-img" /></div>
             <div className="p-details">
-              <span className="p-name">فيسبوك</span>
+              <span className="p-name">{t('فيسبوك')}</span>
               <span className={`p-status ${fbStatus === 'connected' ? 'online' : 'offline'}`}>
-                <span className="dot"></span> {fbStatus === 'connected' ? 'متصل' : 'منقطع'}
+                <span className="dot"></span> {fbStatus === 'connected' ? t('متصل') : t('منقطع')}
               </span>
             </div>
             <div className="wifi-icon"><div className={`w-signal ${fbStatus === 'connected' ? 'active' : ''}`}></div></div>
@@ -123,9 +125,9 @@ export default function Dashboard() {
           <div className="platform-info">
             <div className="p-img-container"><img src={instagramIcon} alt="Instagram" className="p-img" /></div>
             <div className="p-details">
-              <span className="p-name">إنستغرام</span>
+              <span className="p-name">{t('إنستغرام')}</span>
               <span className={`p-status ${igStatus === 'connected' ? 'online' : 'offline'}`}>
-                <span className="dot"></span> {igStatus === 'connected' ? 'متصل' : 'منقطع'}
+                <span className="dot"></span> {igStatus === 'connected' ? t('متصل') : t('منقطع')}
               </span>
             </div>
             <div className="wifi-icon"><div className={`w-signal ${igStatus === 'connected' ? 'active' : ''}`}></div></div>
@@ -139,7 +141,7 @@ export default function Dashboard() {
         <div className="card stat-card" onClick={() => navigate('/conversations')} style={{ cursor: 'pointer' }}>
           <div className="stat-header">
             <div className="s-img-container"><img src={chatIcon} alt="Messages" className="s-img" /></div>
-            <span className="s-title">الرسائل اليوم</span>
+            <span className="s-title">{t('الرسائل اليوم')}</span>
           </div>
           <div className="stat-body">
             <span className="s-value">{stats.messages_today}</span>
@@ -149,7 +151,7 @@ export default function Dashboard() {
         <div className="card stat-card" onClick={() => navigate('/orders')} style={{ cursor: 'pointer' }}>
           <div className="stat-header">
             <div className="s-img-container"><img src={ordersIcon} alt="Orders" className="s-img" /></div>
-            <span className="s-title">الطلبات اليوم</span>
+            <span className="s-title">{t('الطلبات اليوم')}</span>
           </div>
           <div className="stat-body">
             <span className="s-value">{stats.orders_today}</span>
@@ -159,7 +161,7 @@ export default function Dashboard() {
         <div className="card stat-card" onClick={() => navigate('/comments')} style={{ cursor: 'pointer' }}>
           <div className="stat-header">
             <div className="s-img-container"><img src={commentsIcon} alt="Comments" className="s-img" /></div>
-            <span className="s-title">التعليقات اليوم</span>
+            <span className="s-title">{t('التعليقات اليوم')}</span>
           </div>
           <div className="stat-body">
             <span className="s-value">{stats.comments_today}</span>
@@ -169,7 +171,7 @@ export default function Dashboard() {
         <div className="card stat-card" onClick={() => navigate('/reports')} style={{ cursor: 'pointer' }}>
           <div className="stat-header">
             <div className="s-img-container"><img src={packageIcon} alt="Products" className="s-img" /></div>
-            <span className="s-title">إجمالي المبيعات</span>
+            <span className="s-title">{t('إجمالي المبيعات')}</span>
           </div>
           <div className="stat-body">
             <span className="s-value">{Number(stats.revenue_today).toLocaleString()}</span>
@@ -182,8 +184,8 @@ export default function Dashboard() {
         {/* Recent Notifications (replaces Activities) */}
         <div className="card content-card col-activities">
           <div className="c-header">
-            <span className="c-title"><Bell size={14} style={{verticalAlign:'middle',marginLeft:6}}/> آخر الإشعارات</span>
-            <button className="c-btn" onClick={() => navigate('/notifications')}>عرض الكل</button>
+            <span className="c-title"><Bell size={14} style={{verticalAlign:'middle',marginLeft:6}}/> {t('آخر الإشعارات')}</span>
+            <button className="c-btn" onClick={() => navigate('/notifications')}>{t('عرض الكل')}</button>
           </div>
           <div className="activity-list">
             {notifications.length > 0 ? notifications.map((n) => {
@@ -198,19 +200,19 @@ export default function Dashboard() {
                     <span className="a-sub">{(n.body || '').slice(0, 60)}{(n.body||'').length > 60 ? '...' : ''}</span>
                   </div>
                   <div className="a-meta">
-                    <span className="a-time">{new Date(n.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</span>
+                    <span className="a-time">{new Date(n.created_at).toLocaleTimeString(lang === 'en' ? 'en-GB' : 'ar-EG', { hour: '2-digit', minute: '2-digit' })}</span>
                     {!n.is_read && <span style={{width:8, height:8, borderRadius:'50%', background:'#ef4444'}}/>}
                   </div>
                 </div>
               )
-            }) : <div className="empty-state">لا توجد إشعارات حالياً</div>}
+            }) : <div className="empty-state">{t('لا توجد إشعارات حالياً')}</div>}
           </div>
         </div>
 
         {/* System Alerts — real platform status */}
         <div className="card content-card col-alerts">
           <div className="c-header">
-            <span className="c-title">تنبيهات النظام</span>
+            <span className="c-title">{t('تنبيهات النظام')}</span>
             <button className="c-icon-btn" onClick={() => navigate('/settings')}><Settings size={16} /></button>
           </div>
           <div className="alert-list">
@@ -218,8 +220,8 @@ export default function Dashboard() {
               <div className="alert-item">
                 <div className="al-icon success"><CheckCircle size={16}/></div>
                 <div className="al-info">
-                  <span className="al-text">كل المنصات متصلة</span>
-                  <span className="al-sub">النظام يعمل بكامل طاقته</span>
+                  <span className="al-text">{t('كل المنصات متصلة')}</span>
+                  <span className="al-sub">{t('النظام يعمل بكامل طاقته')}</span>
                 </div>
               </div>
             ) : (
@@ -228,8 +230,8 @@ export default function Dashboard() {
                   <div className="alert-item">
                     <div className="al-icon warning"><AlertTriangle size={16}/></div>
                     <div className="al-info">
-                      <span className="al-text">فيسبوك غير مربوط</span>
-                      <span className="al-sub">تواصل معنا لربط الصفحة</span>
+                      <span className="al-text">{t('فيسبوك غير مربوط')}</span>
+                      <span className="al-sub">{t('تواصل معنا لربط الصفحة')}</span>
                     </div>
                   </div>
                 )}
@@ -237,8 +239,8 @@ export default function Dashboard() {
                   <div className="alert-item">
                     <div className="al-icon warning"><AlertTriangle size={16}/></div>
                     <div className="al-info">
-                      <span className="al-text">إنستغرام غير مربوط</span>
-                      <span className="al-sub">تواصل معنا لربط الحساب</span>
+                      <span className="al-text">{t('إنستغرام غير مربوط')}</span>
+                      <span className="al-sub">{t('تواصل معنا لربط الحساب')}</span>
                     </div>
                   </div>
                 )}
@@ -246,8 +248,8 @@ export default function Dashboard() {
                   <div className="alert-item">
                     <div className="al-icon warning"><AlertTriangle size={16}/></div>
                     <div className="al-info">
-                      <span className="al-text">واتساب غير مربوط</span>
-                      <span className="al-sub">تواصل معنا لربط الحساب</span>
+                      <span className="al-text">{t('واتساب غير مربوط')}</span>
+                      <span className="al-sub">{t('تواصل معنا لربط الحساب')}</span>
                     </div>
                   </div>
                 )}
@@ -255,8 +257,8 @@ export default function Dashboard() {
                   <div className="alert-item">
                     <div className="al-icon info"><Info size={16}/></div>
                     <div className="al-info">
-                      <span className="al-text">تلغرام غير مربوط</span>
-                      <span className="al-sub">اربط بوت تلغرام من الإعدادات</span>
+                      <span className="al-text">{t('تلغرام غير مربوط')}</span>
+                      <span className="al-sub">{t('اربط بوت تلغرام من الإعدادات')}</span>
                     </div>
                   </div>
                 )}
@@ -266,8 +268,8 @@ export default function Dashboard() {
               <div className="alert-item">
                 <div className="al-icon warning"><AlertTriangle size={16}/></div>
                 <div className="al-info">
-                  <span className="al-text">اشتراكك منتهي</span>
-                  <span className="al-sub">جدد للاستمرار في استخدام كل المميزات</span>
+                  <span className="al-text">{t('اشتراكك منتهي')}</span>
+                  <span className="al-sub">{t('جدد للاستمرار في استخدام كل المميزات')}</span>
                 </div>
               </div>
             )}
@@ -277,15 +279,15 @@ export default function Dashboard() {
         {/* Quick Actions */}
         <div className="card content-card col-actions">
           <div className="c-header">
-            <span className="c-title">إجراءات سريعة</span>
+            <span className="c-title">{t('إجراءات سريعة')}</span>
           </div>
           <div className="action-grid">
-            <button className="q-action-btn" onClick={() => navigate('/conversations')}><MessageSquare size={24} className="c-blue" /><span>المحادثات</span></button>
-            <button className="q-action-btn" onClick={() => navigate('/sales-agent')}><PlusCircle size={24} className="c-green" /><span>إضافة منتج</span></button>
-            <button className="q-action-btn" onClick={() => navigate('/orders')}><LayoutList size={24} className="c-orange" /><span>عرض الطلبات</span></button>
-            <button className="q-action-btn" onClick={() => navigate('/complaints')}><AlertOctagon size={24} className="c-red" /><span>الشكاوى</span></button>
-            <button className="q-action-btn" onClick={() => navigate('/reports')}><BarChart2 size={24} className="c-purple" /><span>التقارير</span></button>
-            <button className="q-action-btn" onClick={() => navigate('/notifications')}><Bell size={24} className="c-teal" /><span>الإشعارات</span></button>
+            <button className="q-action-btn" onClick={() => navigate('/conversations')}><MessageSquare size={24} className="c-blue" /><span>{t('المحادثات')}</span></button>
+            <button className="q-action-btn" onClick={() => navigate('/sales-agent')}><PlusCircle size={24} className="c-green" /><span>{t('إضافة منتج')}</span></button>
+            <button className="q-action-btn" onClick={() => navigate('/orders')}><LayoutList size={24} className="c-orange" /><span>{t('عرض الطلبات')}</span></button>
+            <button className="q-action-btn" onClick={() => navigate('/complaints')}><AlertOctagon size={24} className="c-red" /><span>{t('الشكاوى')}</span></button>
+            <button className="q-action-btn" onClick={() => navigate('/reports')}><BarChart2 size={24} className="c-purple" /><span>{t('التقارير')}</span></button>
+            <button className="q-action-btn" onClick={() => navigate('/notifications')}><Bell size={24} className="c-teal" /><span>{t('الإشعارات')}</span></button>
           </div>
         </div>
       </div>
@@ -294,9 +296,9 @@ export default function Dashboard() {
       <div className="dash-row bottom-strip">
         <div className="bs-item">
           <div className="bs-info">
-            <span className="bs-label">طلبات الأسبوع</span>
+            <span className="bs-label">{t('طلبات الأسبوع')}</span>
             <span className="bs-value">{weekOrders}</span>
-            <span className="bs-sub">آخر 7 أيام</span>
+            <span className="bs-sub">{t('آخر 7 أيام')}</span>
           </div>
           <div className="bs-chart">
             <ResponsiveContainer width="100%" height="100%">
@@ -307,9 +309,9 @@ export default function Dashboard() {
 
         <div className="bs-item">
           <div className="bs-info">
-            <span className="bs-label">طلبات الشهر</span>
+            <span className="bs-label">{t('طلبات الشهر')}</span>
             <span className="bs-value">{monthOrders}</span>
-            <span className="bs-sub">آخر 30 يوم</span>
+            <span className="bs-sub">{t('آخر 30 يوم')}</span>
           </div>
           <div className="bs-chart">
             <ResponsiveContainer width="100%" height="100%">
@@ -320,8 +322,8 @@ export default function Dashboard() {
 
         <div className="bs-item">
           <div className="bs-info">
-            <span className="bs-label">توزيع المنصات</span>
-            <span className="bs-value">{pieData.length > 1 ? pieData.length + ' منصات' : pieData[0]?.name ? platformLabel[pieData[0].name] || pieData[0].name : '—'}</span>
+            <span className="bs-label">{t('توزيع المنصات')}</span>
+            <span className="bs-value">{pieData.length > 1 ? pieData.length + ' ' + t('منصات') : pieData[0]?.name ? platformLabel[pieData[0].name] || pieData[0].name : '—'}</span>
           </div>
           <div className="bs-chart pie">
             <ResponsiveContainer width="100%" height="100%">
@@ -336,18 +338,18 @@ export default function Dashboard() {
 
         <div className="bs-item">
           <div className="bs-info">
-            <span className="bs-label">إجمالي المبيعات</span>
+            <span className="bs-label">{t('إجمالي المبيعات')}</span>
             <span className="bs-value">{Number(stats.revenue_total || 0).toLocaleString()}</span>
-            <span className="bs-sub">كل الأوقات</span>
+            <span className="bs-sub">{t('كل الأوقات')}</span>
           </div>
           <div className="bs-icon"><DollarSign size={32} className="c-blue" /></div>
         </div>
 
         <div className="bs-item">
           <div className="bs-info">
-            <span className="bs-label">أكثر منصة نشاطاً</span>
+            <span className="bs-label">{t('أكثر منصة نشاطاً')}</span>
             <span className="bs-value">{topPlatform ? (platformLabel[topPlatform.name] || topPlatform.name) : '—'}</span>
-            <span className="bs-sub">{topPlatform ? topPlatform.value + ' طلب' : 'لا يوجد بيانات بعد'}</span>
+            <span className="bs-sub">{topPlatform ? topPlatform.value + ' ' + t('طلب') : t('لا يوجد بيانات بعد')}</span>
           </div>
           <div className="bs-icon"><BarChart2 size={32} className="c-green" /></div>
         </div>

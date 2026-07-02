@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
+import { useT } from '../../lib/i18n'
 import './Conversations.css'
 
 import whatsappIcon from '../../assets/icons/whatsapp.png'
@@ -39,6 +40,8 @@ const STATUS_MAP = {
 }
 
 export default function Conversations() {
+  const { t, lang } = useT()
+  const locale = lang === 'en' ? 'en-GB' : 'ar-EG'
   const [convs, setConvs] = useState([])
   const [selected, setSelected] = useState(null)
   const [messages, setMessages] = useState([])
@@ -128,7 +131,7 @@ export default function Conversations() {
       }
 
       if (res?.success === false) {
-        toast.error('فشل الإرسال: ' + (res.error || 'خطأ'))
+        toast.error(t('فشل الإرسال') + ': ' + (res.error || t('خطأ')))
         setReply(msg) // restore so user can retry
       } else {
         // Small delay then reload to catch DB-saved message
@@ -138,7 +141,7 @@ export default function Conversations() {
         }, 200)
       }
     } catch (e) {
-      toast.error('خطأ في الإرسال')
+      toast.error(t('خطأ في الإرسال'))
       setReply(msg)
     } finally {
       setSending(false)
@@ -160,7 +163,7 @@ export default function Conversations() {
       {/* Left panel */}
       <div className="conv-list-panel">
         <div className="conv-list-header">
-          <h2>المحادثات</h2>
+          <h2>{t('المحادثات')}</h2>
           <span className="conv-count">{convs.length}</span>
         </div>
 
@@ -174,7 +177,7 @@ export default function Conversations() {
               onClick={() => setPlatformFilter(p.id)}
             >
               {p.icon && <img src={p.icon} alt={p.label} className="ptab-icon" />}
-              <span>{p.label}</span>
+              <span>{t(p.label)}</span>
             </button>
           ))}
         </div>
@@ -182,9 +185,9 @@ export default function Conversations() {
         <div className="conv-list">
           {convs.length === 0 ? (
             <div className="empty-state">
-              <p>لا توجد محادثات</p>
+              <p>{t('لا توجد محادثات')}</p>
               <span style={{fontSize:12, color:'var(--text-muted)'}}>
-                {platformFilter !== 'all' ? `لا توجد محادثات ${PLATFORMS.find(p=>p.id===platformFilter)?.label}` : 'ستظهر المحادثات هنا عند ورود رسائل'}
+                {platformFilter !== 'all' ? `${t('لا توجد محادثات')} ${t(PLATFORMS.find(p=>p.id===platformFilter)?.label)}` : t('ستظهر المحادثات هنا عند ورود رسائل')}
               </span>
             </div>
           ) : convs.map(c => (
@@ -209,11 +212,11 @@ export default function Conversations() {
                   c.status === 'needs_attention' ? 'badge-warning' :
                   c.status === 'new' ? 'badge-info' : 'badge-default'
                 }`} style={{fontSize:10}}>
-                  {STATUS_MAP[c.status] || c.status}
+                  {t(STATUS_MAP[c.status] || c.status)}
                 </span>
                 {c.last_message_at && (
                   <div style={{fontSize:10,color:'var(--text-muted)',marginTop:4}}>
-                    {new Date(c.last_message_at).toLocaleTimeString('ar', {hour:'2-digit', minute:'2-digit'})}
+                    {new Date(c.last_message_at).toLocaleTimeString(locale, {hour:'2-digit', minute:'2-digit'})}
                   </div>
                 )}
               </div>
@@ -227,8 +230,8 @@ export default function Conversations() {
         {!selected ? (
           <div className="empty-state" style={{height:'100%', flexDirection:'column', gap:12}}>
             <div style={{fontSize:48, opacity:0.3}}>💬</div>
-            <p>اختر محادثة من القائمة</p>
-            <span style={{fontSize:12, color:'var(--text-muted)'}}>ستظهر الرسائل هنا</span>
+            <p>{t('اختر محادثة من القائمة')}</p>
+            <span style={{fontSize:12, color:'var(--text-muted)'}}>{t('ستظهر الرسائل هنا')}</span>
           </div>
         ) : (
           <>
@@ -242,14 +245,14 @@ export default function Conversations() {
                   <div style={{fontWeight:700, fontSize:15}}>{selected.sender_name || selected.sender_id}</div>
                   <div style={{fontSize:11, color: platformColor, display:'flex', alignItems:'center', gap:4}}>
                     <span style={{width:6, height:6, borderRadius:'50%', background: platformColor, display:'inline-block'}}></span>
-                    {selected.platform} · {STATUS_MAP[selected.status] || selected.status}
+                    {selected.platform} · {t(STATUS_MAP[selected.status] || selected.status)}
                   </div>
                 </div>
               </div>
               <div className="flex gap-2 items-center">
                 {selected.ai_paused_until && new Date(selected.ai_paused_until) > new Date() && (
                   <span style={{fontSize:11, color:'#fff', background:'#f59e0b', padding:'4px 10px', borderRadius:20, fontWeight:700}}>
-                    🤖 AI متوقف · يعود {new Date(selected.ai_paused_until).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'})}
+                    🤖 {t('AI متوقف · يعود')} {new Date(selected.ai_paused_until).toLocaleTimeString(locale,{hour:'2-digit',minute:'2-digit'})}
                   </span>
                 )}
                 <div style={{position:'relative'}}>
@@ -270,10 +273,10 @@ export default function Conversations() {
                     }}
                     defaultValue=""
                     style={{padding:'6px 14px', borderRadius:10, background:'var(--bg-input,#1a1d24)', color:'inherit', border:'1px solid var(--border-color,#2a2e37)', fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit'}}>
-                    <option value="" disabled>🤖 تحكم بالـ AI</option>
-                    <option value="1">إيقاف الرد ساعة</option>
-                    <option value="24">إيقاف الرد 24 ساعة</option>
-                    <option value="resume">استئناف الرد الذكي</option>
+                    <option value="" disabled>🤖 {t('تحكم بالـ AI')}</option>
+                    <option value="1">{t('إيقاف الرد ساعة')}</option>
+                    <option value="24">{t('إيقاف الرد 24 ساعة')}</option>
+                    <option value="resume">{t('استئناف الرد الذكي')}</option>
                   </select>
                 </div>
                 <span style={{fontSize:11, color:'var(--text-muted)', background:'var(--glass-bg)', padding:'4px 10px', borderRadius:20, border:'1px solid var(--border-color)'}}>
@@ -286,18 +289,18 @@ export default function Conversations() {
             <div className="chat-messages">
               {messages.length === 0 ? (
                 <div className="empty-state" style={{height:'100%'}}>
-                  <p style={{color:'var(--text-muted)', fontSize:13}}>لا توجد رسائل بعد</p>
+                  <p style={{color:'var(--text-muted)', fontSize:13}}>{t('لا توجد رسائل بعد')}</p>
                 </div>
               ) : messages.map((m, i) => {
                 // customer = incoming (right). assistant = AI reply (left, green). agent = manual reply (left, blue).
                 const cls = m.sender === 'customer' ? 'incoming' : (m.sender === 'assistant' ? 'ai' : 'agent')
                 return (
                   <div key={i} className={`msg-bubble ${cls}`}>
-                    {m.sender === 'assistant' && <span className="msg-tag">🤖 رد ذكي</span>}
-                    {m.sender === 'agent' && <span className="msg-tag">👤 ردّك</span>}
+                    {m.sender === 'assistant' && <span className="msg-tag">🤖 {t('رد ذكي')}</span>}
+                    {m.sender === 'agent' && <span className="msg-tag">👤 {t('ردّك')}</span>}
                     <div className="msg-text">{m.content}</div>
                     <div className="msg-time">
-                      {new Date(m.created_at).toLocaleTimeString('ar', {hour:'2-digit', minute:'2-digit'})}
+                      {new Date(m.created_at).toLocaleTimeString(locale, {hour:'2-digit', minute:'2-digit'})}
                     </div>
                   </div>
                 )
@@ -311,7 +314,7 @@ export default function Conversations() {
                 ref={inputRef}
                 className="input"
                 style={{flex:1}}
-                placeholder="اكتب ردًا... (Enter للإرسال)"
+                placeholder={t('اكتب ردًا... (Enter للإرسال)')}
                 value={reply}
                 onChange={e => setReply(e.target.value)}
                 onKeyDown={handleKeyDown}
@@ -326,9 +329,9 @@ export default function Conversations() {
                 {sending ? (
                   <span style={{display:'inline-block', animation:'spin 1s linear infinite'}}>↻</span>
                 ) : (
-                  <img src={sendIcon} className="btn-img-icon" alt="إرسال" />
+                  <img src={sendIcon} className="btn-img-icon" alt={t('إرسال')} />
                 )}
-                {sending ? 'جارٍ...' : 'إرسال'}
+                {sending ? t('جارٍ...') : t('إرسال')}
               </button>
             </div>
           </>
