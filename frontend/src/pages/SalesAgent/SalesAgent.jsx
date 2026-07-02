@@ -21,7 +21,33 @@ const TABS = [
   { label: 'System Prompt', icon: agentIcon },
 ]
 const PERSONALITIES = [{v:'friendly',l:'ودي ومرح'},{v:'formal',l:'رسمي واحترافي'},{v:'professional',l:'احترافي'}]
-const LANGUAGES = [{v:'ar',l:'عربي'},{v:'en',l:'English'},{v:'multi',l:'متعدد اللغات'}]
+// Language the AI SPEAKS in when replying to customers.
+const LANGUAGES = [
+  {v:'auto', l:'حسب لغة العميل (تلقائي)'},
+  {v:'ar',   l:'العربية'},
+  {v:'en',   l:'الإنجليزية'},
+]
+// Arabic dialects (shown when language = العربية).
+const AR_DIALECTS = [
+  {v:'msa',       l:'الفصحى'},
+  {v:'jordanian', l:'الأردنية'},
+  {v:'gulf',      l:'الخليجية'},
+  {v:'egyptian',  l:'المصرية'},
+  {v:'maghrebi',  l:'المغاربية'},
+  {v:'iraqi',     l:'العراقية'},
+]
+// English tones (shown when language = الإنجليزية).
+const EN_TONES = [
+  {v:'en_formal',   l:'رسمي (Formal)'},
+  {v:'en_friendly', l:'ودّي (Friendly)'},
+]
+// The `language` column stores EITHER a legacy code ("ar"|"en"|"multi") OR JSON {lang,dialect}.
+function parseLangSetting(raw) {
+  const s = (raw || '').trim()
+  if (s.startsWith('{')) { try { const o = JSON.parse(s); return { lang: o.lang || 'auto', dialect: o.dialect || '' } } catch {} }
+  if (s === '' || s === 'multi' || s === 'auto') return { lang: 'auto', dialect: '' }
+  return { lang: s, dialect: '' } // legacy 'ar' | 'en'
+}
 
 // Built-in product fields (mapped to real columns). The owner can toggle these on/off.
 const BUILTIN_FIELDS = [
@@ -65,6 +91,17 @@ export default function SalesAgent() {
     setLoaded(true)
     // Lock the store form by default when there's saved data (user clicks "Edit" to unlock)
     if (cfg?.store_name) setStoreLocked(true)
+  }
+
+  // Update language/dialect (stored as JSON in store.language). Applies sensible
+  // default dialects when switching languages.
+  function setLangSetting(patch) {
+    const cur = parseLangSetting(store.language)
+    const next = { ...cur, ...patch }
+    if (next.lang === 'ar' && !AR_DIALECTS.some(d => d.v === next.dialect)) next.dialect = 'msa'
+    if (next.lang === 'en' && !EN_TONES.some(d => d.v === next.dialect)) next.dialect = 'en_formal'
+    if (next.lang === 'auto') next.dialect = ''
+    setStore(s => ({ ...s, language: JSON.stringify(next) }))
   }
 
   async function saveStore() {
@@ -306,10 +343,28 @@ ${productLines || 'لا توجد منتجات'}
           </div>
           <div className="grid-3">
             <div className="input-group">
-              <label className="input-label">اللغة الافتراضية</label>
-              <select className="select" disabled={storeLocked} value={store.language||'ar'} onChange={e => setStore(s=>({...s,language:e.target.value}))}>
+              <label className="input-label">لغة رد الذكاء الاصطناعي</label>
+              <select className="select" disabled={storeLocked} value={parseLangSetting(store.language).lang} onChange={e => setLangSetting({ lang: e.target.value })}>
                 {LANGUAGES.map(l => <option key={l.v} value={l.v}>{l.l}</option>)}
               </select>
+            </div>
+            <div className="input-group">
+              <label className="input-label">
+                {parseLangSetting(store.language).lang === 'en' ? 'نبرة الإنجليزية' : 'اللهجة'}
+              </label>
+              {parseLangSetting(store.language).lang === 'auto' ? (
+                <select className="select" disabled value="">
+                  <option value="">تُطابق لهجة العميل تلقائياً</option>
+                </select>
+              ) : parseLangSetting(store.language).lang === 'en' ? (
+                <select className="select" disabled={storeLocked} value={parseLangSetting(store.language).dialect || 'en_formal'} onChange={e => setLangSetting({ dialect: e.target.value })}>
+                  {EN_TONES.map(d => <option key={d.v} value={d.v}>{d.l}</option>)}
+                </select>
+              ) : (
+                <select className="select" disabled={storeLocked} value={parseLangSetting(store.language).dialect || 'msa'} onChange={e => setLangSetting({ dialect: e.target.value })}>
+                  {AR_DIALECTS.map(d => <option key={d.v} value={d.v}>{d.l}</option>)}
+                </select>
+              )}
             </div>
             <div className="input-group">
               <label className="input-label">شخصية الـ AI</label>
@@ -317,12 +372,12 @@ ${productLines || 'لا توجد منتجات'}
                 {PERSONALITIES.map(p => <option key={p.v} value={p.v}>{p.l}</option>)}
               </select>
             </div>
-            <div className="input-group">
-              <label className="input-label">العملة</label>
-              <select className="select" disabled={storeLocked} value={store.currency||'JOD'} onChange={e => setStore(s=>({...s,currency:e.target.value}))}>
-                {CURRENCIES.map(c => <option key={c.v} value={c.v}>{c.l}</option>)}
-              </select>
-            </div>
+          </div>
+          <div className="input-group">
+            <label className="input-label">العملة</label>
+            <select className="select" disabled={storeLocked} value={store.currency||'JOD'} onChange={e => setStore(s=>({...s,currency:e.target.value}))}>
+              {CURRENCIES.map(c => <option key={c.v} value={c.v}>{c.l}</option>)}
+            </select>
           </div>
           <div className="input-group">
             <label className="input-label">ساعات العمل</label>
