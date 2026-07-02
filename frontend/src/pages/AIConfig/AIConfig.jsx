@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
+import { useT } from '../../lib/i18n'
 import './AIConfig.css'
 
 import openaiIcon from '../../assets/icons/openai.png'
@@ -39,6 +40,7 @@ const PROVIDERS = [
 ]
 
 export default function AIConfig() {
+  const { t } = useT()
   const [selected, setSelected] = useState('openai')
   const [configs, setConfigs] = useState({})
   const [testing, setTesting] = useState(false)
@@ -73,7 +75,7 @@ export default function AIConfig() {
     setFetchingModels(true)
     const models = await window.api?.ai.fetchModels(cfg)
     if (models && models.error) {
-      toast.error(`فشل جلب النماذج: ${models.error}`)
+      toast.error(`${t('فشل جلب النماذج')}: ${models.error}`)
       setDynamicModels([])
     } else if (models && Array.isArray(models)) {
       setDynamicModels(models)
@@ -102,7 +104,7 @@ export default function AIConfig() {
 
   async function save() {
     await window.api?.ai.saveConfig({ ...current, provider: selected })
-    toast.success('تم حفظ إعدادات الذكاء الاصطناعي ✓')
+    toast.success(t('تم حفظ إعدادات الذكاء الاصطناعي ✓'))
   }
 
   async function test() {
@@ -111,10 +113,10 @@ export default function AIConfig() {
     setTesting(false)
     setTestResult(res)
     if (res?.success) {
-      toast.success('الاتصال ناجح! ✓')
+      toast.success(t('الاتصال ناجح! ✓'))
       fetchModels({ ...current, provider: selected })
     }
-    else toast.error('فشل الاتصال: ' + (res?.error || 'خطأ غير معروف'))
+    else toast.error(t('فشل الاتصال') + ': ' + (res?.error || t('خطأ غير معروف')))
   }
 
   const prov = PROVIDERS.find(p => p.id === selected)
@@ -122,14 +124,14 @@ export default function AIConfig() {
   return (
     <div className="animate-fade">
       <div className="page-header">
-        <h1>إعدادات الذكاء الاصطناعي</h1>
-        <p>اختر مزود الـ AI وأدخل مفتاح API الخاص بك</p>
+        <h1>{t('إعدادات الذكاء الاصطناعي')}</h1>
+        <p>{t('اختر مزود الـ AI وأدخل مفتاح API الخاص بك')}</p>
       </div>
 
       <div className="ai-layout">
         {/* Provider selector */}
         <div className="provider-list card">
-          <div className="card-title">اختر مزود الخدمة</div>
+          <div className="card-title">{t('اختر مزود الخدمة')}</div>
           <div className="provider-grid-modern">
             {PROVIDERS.map(p => {
               const isActive = configs[p.id]?.apiKey || p.id === 'ollama'
@@ -144,7 +146,7 @@ export default function AIConfig() {
                   </div>
                   <div className="provider-info-modern">
                     <span className="provider-name-modern">{p.name}</span>
-                    {isActive && <span className="setup-badge">جاهز ✓</span>}
+                    {isActive && <span className="setup-badge">{t('جاهز')} ✓</span>}
                   </div>
                 </div>
               )
@@ -162,20 +164,20 @@ export default function AIConfig() {
 
             {selected !== 'ollama' && (
               <div className="input-group">
-                <label className="input-label">مفتاح API</label>
+                <label className="input-label">{t('مفتاح API')}</label>
                 <input type="password" className="input" placeholder="sk-..." value={current.apiKey || ''} onChange={e => updateField('apiKey', e.target.value)} />
               </div>
             )}
 
             {selected === 'ollama' && (
               <div className="input-group">
-                <label className="input-label">عنوان الخادم المحلي</label>
+                <label className="input-label">{t('عنوان الخادم المحلي')}</label>
                 <input className="input" placeholder="http://localhost:11434" value={current.baseUrl || ''} onChange={e => updateField('baseUrl', e.target.value)} />
               </div>
             )}
 
             <div className="input-group">
-              <label className="input-label">اختيار النموذج الذكي</label>
+              <label className="input-label">{t('اختيار النموذج الذكي')}</label>
               
               <div className="custom-model-selector">
                 <div className="search-bar-container">
@@ -183,7 +185,7 @@ export default function AIConfig() {
                   <input 
                     type="text" 
                     className="model-search-input-modern" 
-                    placeholder="ابحث عن نموذج... (مثلاً: o1, flash, sonnet)" 
+                    placeholder={t('ابحث عن نموذج... (مثلاً: o1, flash, sonnet)')}
                     value={modelSearch} 
                     onChange={e => setModelSearch(e.target.value)} 
                   />
@@ -193,7 +195,7 @@ export default function AIConfig() {
                 <div className="models-grid-modern">
                   {/* Default/Recommended Models */}
                   <div className="models-section">
-                    <div className="section-header">النماذج المقترحة</div>
+                    <div className="section-header">{t('النماذج المقترحة')}</div>
                     <div className="models-list-modern">
                       {[...new Set([...(prov?.models || [])])]
                         .filter(m => m.toLowerCase().includes(modelSearch.toLowerCase()))
@@ -214,7 +216,7 @@ export default function AIConfig() {
                   {/* Dynamic Models from API */}
                   {dynamicModels.length > 0 && (
                     <div className="models-section mt-4">
-                      <div className="section-header">النماذج المتوفرة في حسابك</div>
+                      <div className="section-header">{t('النماذج المتوفرة في حسابك')}</div>
                       <div className="models-list-modern">
                         {dynamicModels
                           .filter(m => !prov?.models.includes(m)) // Hide if already in recommended
@@ -241,16 +243,16 @@ export default function AIConfig() {
                     onClick={() => fetchModels()}
                     disabled={fetchingModels || (!current.apiKey && selected !== 'ollama')}
                   >
-                    🔄 تحديث القائمة من {prov?.name}
+                    🔄 {t('تحديث القائمة من')} {prov?.name}
                   </button>
-                  <button 
+                  <button
                     className="btn btn-ghost btn-sm"
                     onClick={() => {
                       updateField('model', 'custom')
                       setModelSearch('')
                     }}
                   >
-                    ➕ استخدام نموذج مخصص
+                    ➕ {t('استخدام نموذج مخصص')}
                   </button>
                 </div>
               </div>
@@ -259,10 +261,10 @@ export default function AIConfig() {
             {/* Model Input - Always show if 'custom' or not in lists */}
             {(current.model === 'custom' || !current.model) && (
               <div className="input-group animate-slide-down">
-                <label className="input-label">أدخل اسم النموذج يدوياً (ID)</label>
+                <label className="input-label">{t('أدخل اسم النموذج يدوياً (ID)')}</label>
                 <input
                   className="input"
-                  placeholder="مثال: gpt-4o أو llama3"
+                  placeholder={t('مثال: gpt-4o أو llama3')}
                   value={current.model === 'custom' ? '' : current.model}
                   onChange={e => updateField('model', e.target.value)}
                 />
@@ -276,23 +278,23 @@ export default function AIConfig() {
             )}
 
             <div className="flex gap-3 mt-4">
-              <button className="btn btn-primary" onClick={save}>حفظ الإعدادات</button>
+              <button className="btn btn-primary" onClick={save}>{t('حفظ الإعدادات')}</button>
               <button className="btn btn-secondary" onClick={test} disabled={testing}>
-                {testing ? <span className="animate-spin">↻</span> : ''} اختبار الاتصال
+                {testing ? <span className="animate-spin">↻</span> : ''} {t('اختبار الاتصال')}
               </button>
             </div>
           </div>
 
           <div className="card ai-info-card">
-            <div className="card-title">معلومات المزود</div>
+            <div className="card-title">{t('معلومات المزود')}</div>
             <div className="info-grid">
-              {selected === 'openai' && <><p>🌐 <strong>OpenAI</strong> — GPT-4o هو الأقوى والأسرع</p><p>🔗 الحصول على المفتاح: <span className="link">platform.openai.com</span></p></>}
-              {selected === 'anthropic' && <><p>🌐 <strong>Anthropic</strong> — Claude 3.5 Sonnet ممتاز للعربية</p><p>🔗 الحصول على المفتاح: <span className="link">console.anthropic.com</span></p></>}
-              {selected === 'google' && <><p>🌐 <strong>Google</strong> — Gemini 1.5 Pro يدعم العربية بشكل ممتاز</p><p>🔗 الحصول على المفتاح: <span className="link">aistudio.google.com</span></p></>}
-              {selected === 'groq' && <><p>🌐 <strong>Groq</strong> — سرعة استثنائية مع Llama 3</p><p>🔗 الحصول على المفتاح: <span className="link">console.groq.com</span></p></>}
-              {selected === 'mistral' && <><p>🌐 <strong>Mistral</strong> — نموذج أوروبي متوازن</p><p>🔗 الحصول على المفتاح: <span className="link">console.mistral.ai</span></p></>}
-              {selected === 'openrouter' && <><p>🌐 <strong>OpenRouter</strong> — وصول موحد لجميع النماذج</p><p>🔗 الحصول على المفتاح: <span className="link">openrouter.ai</span></p></>}
-              {selected === 'ollama' && <><p>🖥 <strong>Ollama</strong> — يعمل محلياً بدون إنترنت</p><p>📥 تثبيت: <span className="link">ollama.ai</span></p><p>▶ تشغيل: <code>ollama run llama3</code></p></>}
+              {selected === 'openai' && <><p>🌐 <strong>OpenAI</strong> — {t('GPT-4o هو الأقوى والأسرع')}</p><p>🔗 {t('الحصول على المفتاح:')} <span className="link">platform.openai.com</span></p></>}
+              {selected === 'anthropic' && <><p>🌐 <strong>Anthropic</strong> — {t('Claude 3.5 Sonnet ممتاز للعربية')}</p><p>🔗 {t('الحصول على المفتاح:')} <span className="link">console.anthropic.com</span></p></>}
+              {selected === 'google' && <><p>🌐 <strong>Google</strong> — {t('Gemini 1.5 Pro يدعم العربية بشكل ممتاز')}</p><p>🔗 {t('الحصول على المفتاح:')} <span className="link">aistudio.google.com</span></p></>}
+              {selected === 'groq' && <><p>🌐 <strong>Groq</strong> — {t('سرعة استثنائية مع Llama 3')}</p><p>🔗 {t('الحصول على المفتاح:')} <span className="link">console.groq.com</span></p></>}
+              {selected === 'mistral' && <><p>🌐 <strong>Mistral</strong> — {t('نموذج أوروبي متوازن')}</p><p>🔗 {t('الحصول على المفتاح:')} <span className="link">console.mistral.ai</span></p></>}
+              {selected === 'openrouter' && <><p>🌐 <strong>OpenRouter</strong> — {t('وصول موحد لجميع النماذج')}</p><p>🔗 {t('الحصول على المفتاح:')} <span className="link">openrouter.ai</span></p></>}
+              {selected === 'ollama' && <><p>🖥 <strong>Ollama</strong> — {t('يعمل محلياً بدون إنترنت')}</p><p>📥 {t('تثبيت:')} <span className="link">ollama.ai</span></p><p>▶ {t('تشغيل:')} <code>ollama run llama3</code></p></>}
             </div>
           </div>
         </div>
