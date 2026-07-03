@@ -1,29 +1,38 @@
-import cron from 'node-cron';
 import { supabase } from '../supabase';
-import { nashir, nashirKey } from '../handlers/nashir';
+import { nashir } from '../handlers/nashir';
 import { processInbound } from '../handlers/inbound';
 import { processInboundComment } from '../handlers/comments';
 
 // Nashir has NO webhook for incoming DMs (their webhooks only fire on post.published).
 // Their official auto-reply pattern is polling GET /messages?is_read=false — this poller
 // is therefore the PRIMARY ingestion path, not a fallback.
+//
+// LATENCY: we self-schedule a fast loop (default every 8s, POLL_INTERVAL_MS to override)
+// so a customer message appears / gets answered within ~8s + AI time, instead of up to 60s.
+// The loop schedules the NEXT run only AFTER the current one finishes, so cycles never overlap
+// no matter how slow one gets.
+const POLL_INTERVAL_MS = Number(process.env.POLL_INTERVAL_MS) || 8000;
 
 // Only AI-reply to messages newer than this; older backlog is stored silently.
 const FRESH_WINDOW_MS = 24 * 3600 * 1000;
 // Gemini quota guard: max AI replies per user per cycle.
 const MAX_AI_REPLIES_PER_CYCLE = 10;
 
-let running = false;
+/** Resolve the Nashir key for a user WITHOUT an extra DB read — the poller query already
+ *  fetched nashir_api_key, so we use it directly and fall back to the owner env key. */
+function keyFor(user: any): string | null {
+  const own = (user?.nashir_api_key || '').trim();
+  return own || process.env.NASHIR_API_KEY || null;
+}
 
 async function pollUser(user: any) {
+  const key = keyFor(user);
+  if (!key) return;
+
   // Multi-tenant safety: a user with no assigned pages AND no personal key must never
   // poll unscoped — they would ingest (and answer!) every other client's messages
   // through the owner fallback key.
-  const key = await nashirKey(user.user_id);
-  if (!key) return;
-  const { data: prof } = await supabase.from('user_profiles')
-    .select('nashir_api_key').eq('user_id', user.user_id).single();
-  const hasOwnKey = !!(prof?.nashir_api_key && prof.nashir_api_key.trim());
+  const hasOwnKey = !!(user?.nashir_api_key && user.nashir_api_key.trim());
   const assigned: string[] = Array.isArray(user.nashir_account_ids)
     ? user.nashir_account_ids.map((x: any) => String(x).trim()).filter(Boolean)
     : [];
@@ -82,15 +91,24 @@ async function pollUser(user: any) {
   }
 }
 
+async function runCycle() {
+  // Fetch nashir_api_key here so pollUser needs ZERO extra DB reads per user — critical
+  // now that we poll every few seconds.
+  const { data: users } = await supabase.from('user_profiles')
+    .select('user_id, nashir_account_ids, nashir_api_key')
+    .eq('subscription_status', 'active');
+  for (const u of users || []) await pollUser(u).catch(console.error);
+}
+
 export function startPoller() {
-  cron.schedule('* * * * *', async () => {
-    if (running) return; // never overlap a slow cycle
-    running = true;
-    try {
-      const { data: users } = await supabase.from('user_profiles')
-        .select('user_id, nashir_account_ids').eq('subscription_status', 'active');
-      for (const u of users || []) await pollUser(u).catch(console.error);
-    } finally { running = false; }
-  });
-  console.log('Nashir poller started (every 1 min)');
+  let stopped = false;
+  const loop = async () => {
+    if (stopped) return;
+    try { await runCycle(); }
+    catch (e: any) { console.error('[poller cycle]', e?.message || e); }
+    finally { if (!stopped) setTimeout(loop, POLL_INTERVAL_MS); }
+  };
+  loop();
+  console.log(`Nashir poller started (every ${POLL_INTERVAL_MS}ms)`);
+  return () => { stopped = true; };
 }
