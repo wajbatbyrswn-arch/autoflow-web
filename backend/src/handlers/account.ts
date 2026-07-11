@@ -31,11 +31,11 @@ export const accountHandlers = {
     await ensureProfile(userId);
     // Try the new-schema select; fall back if telegram_bot_token column doesn't exist yet.
     let { data: profile, error } = await supabase.from('user_profiles')
-      .select('user_id, email, full_name, subscription_status, subscription_expires_at, plan, is_admin, ai_model, nashir_account_ids, telegram_bot_token, store_id:user_id')
+      .select('user_id, email, full_name, subscription_status, subscription_expires_at, plan, is_admin, ai_model, nashir_account_ids, telegram_bot_token, store_id:user_id, created_at')
       .eq('user_id', userId).single();
     if (error) {
       const fallback = await supabase.from('user_profiles')
-        .select('user_id, email, full_name, subscription_status, subscription_expires_at, plan, is_admin, ai_model, nashir_account_ids, store_id:user_id')
+        .select('user_id, email, full_name, subscription_status, subscription_expires_at, plan, is_admin, ai_model, nashir_account_ids, store_id:user_id, created_at')
         .eq('user_id', userId).single();
       profile = fallback.data as any;
     }

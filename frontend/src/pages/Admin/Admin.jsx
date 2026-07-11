@@ -80,7 +80,7 @@ export default function Admin() {
         <h2 style={h2}>{t('المستخدمون')} ({users.length})</h2>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
           <thead><tr style={{ textAlign: 'right', opacity: .7 }}>
-            <th style={th}>{t('المتجر')}</th><th style={th}>ID</th><th style={th}>{t('الحالة')}</th><th style={th}>{t('الموديل')}</th><th style={th}>{t('الانتهاء')}</th><th style={th}>{t('تلغرام (توكن)')}</th><th style={th}>{t('صفحات ناشر')}</th><th style={th}>Webhook + Business</th>
+            <th style={th}>{t('المتجر')}</th><th style={th}>ID</th><th style={th}>{t('الحالة')}</th><th style={th}>{t('الخصم')}</th><th style={th}>{t('الموديل')}</th><th style={th}>{t('الانتهاء')}</th><th style={th}>{t('تلغرام (توكن)')}</th><th style={th}>{t('صفحات ناشر')}</th><th style={th}>Webhook + Business</th>
           </tr></thead>
           <tbody>
             {users.map(u => (
@@ -95,6 +95,9 @@ export default function Admin() {
                   <select value={u.subscription_status} onChange={e => updateUser(u.user_id, { subscription_status: e.target.value })} style={sel}>
                     <option value="active">{t('نشط')}</option><option value="inactive">{t('غير نشط')}</option><option value="expired">{t('منتهي')}</option>
                   </select>
+                </td>
+                <td style={td}>
+                  <DiscountBadge createdAt={u.created_at} />
                 </td>
                 <td style={td}>
                   <select value={u.ai_provider || ''} onChange={e => updateUser(u.user_id, { ai_provider: e.target.value })} style={sel}>
@@ -270,6 +273,29 @@ function TelegramModal({ state, setState, onSaved }) {
         )}
       </div>
     </div>
+  )
+}
+
+function DiscountBadge({ createdAt }) {
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    if (!createdAt) return
+    const ms = new Date(createdAt).getTime() + 24 * 60 * 60 * 1000 - Date.now()
+    if (ms <= 0) return
+    const id = setInterval(() => setTick(t => t + 1), 60000) // re-render every minute
+    return () => clearInterval(id)
+  }, [createdAt])
+
+  if (!createdAt) return <span style={{ opacity: 0.4, fontSize: 11 }}>—</span>
+  const ms = new Date(createdAt).getTime() + 24 * 60 * 60 * 1000 - Date.now()
+  if (ms <= 0) return <span style={{ color: '#9aa0ac', fontSize: 11 }}>منتهي</span>
+
+  const hours = Math.floor(ms / 3600000)
+  const mins = Math.floor((ms % 3600000) / 60000)
+  return (
+    <span style={{ color: '#10b981', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap' }}>
+      🎉 نشط ({hours}س {mins}د)
+    </span>
   )
 }
 

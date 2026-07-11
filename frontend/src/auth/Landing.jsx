@@ -491,6 +491,8 @@ const TAB_COMPONENTS = {
 
 export default function Landing() {
   const [active, setActive] = useState('home')
+  const [modalOpen, setModalOpen] = useState(null) // 'terms' | 'privacy' | null
+  const [isArabic] = useState(() => (navigator.language || navigator.userLanguage || 'ar').startsWith('ar'))
   const ActiveTab = TAB_COMPONENTS[active] || HomeTab
 
   // The app's global CSS sets html/body/#root to overflow:hidden for the
@@ -556,12 +558,139 @@ export default function Landing() {
           </div>
           <div className="lp-footer-text">© 2026 AutoFlow Chat · صُنع في 🇯🇴 الأردن</div>
           <div className="lp-footer-links">
-            <a href={WHATSAPP_LINK} target="_blank" rel="noreferrer">واتساب</a>
-            <a href={FACEBOOK_LINK} target="_blank" rel="noreferrer">فيسبوك</a>
-            <a href={INSTAGRAM_LINK} target="_blank" rel="noreferrer">إنستغرام</a>
+            <button onClick={() => setModalOpen('terms')} style={footerBtnLink}>
+              {isArabic ? 'شروط الخدمة' : 'Terms of Service'}
+            </button>
+            <button onClick={() => setModalOpen('privacy')} style={footerBtnLink}>
+              {isArabic ? 'سياسة الخصوصية' : 'Privacy Policy'}
+            </button>
+            <a href={WHATSAPP_LINK} target="_blank" rel="noreferrer">{isArabic ? 'واتساب' : 'WhatsApp'}</a>
+            <a href={FACEBOOK_LINK} target="_blank" rel="noreferrer">{isArabic ? 'فيسبوك' : 'Facebook'}</a>
+            <a href={INSTAGRAM_LINK} target="_blank" rel="noreferrer">{isArabic ? 'إنستغرام' : 'Instagram'}</a>
           </div>
         </div>
       </footer>
+
+      {modalOpen && (
+        <div onClick={() => setModalOpen(null)} style={modalOverlayStyle}>
+          <div onClick={e => e.stopPropagation()} style={modalContentStyle}>
+            <div style={modalHeaderStyle}>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>
+                {modalOpen === 'terms' 
+                  ? (isArabic ? 'شروط الخدمة' : 'Terms of Service') 
+                  : (isArabic ? 'سياسة الخصوصية' : 'Privacy Policy')}
+              </h3>
+              <button onClick={() => setModalOpen(null)} style={modalCloseBtnStyle}>✕</button>
+            </div>
+            <div style={modalBodyStyle}>
+              {modalOpen === 'terms' ? (
+                isArabic ? (
+                  <div style={{ lineHeight: 1.8, fontSize: 13, color: 'var(--text-secondary, #9aa0ac)' }}>
+                    <p>أهلاً بك في منصة <strong>AutoFlow Chat</strong>. باستعمالك للمنصة، فإنك توافق على الشروط التالية:</p>
+                    <ol style={{ paddingRight: 20, margin: '10px 0' }}>
+                      <li><strong>الخدمة والأتمتة:</strong> المنصة تقدم خدمة أتمتة الردود والمبيعات عبر الذكاء الاصطناعي. تقع مسؤولية مراجعة وصحة الردود على صاحب المتجر (المشترك).</li>
+                      <li><strong>عدم إساءة الاستخدام:</strong> يمنع منعاً باتاً استخدام أداة الأتمتة لإرسال رسائل سبام أو رسائل غير مرغوب فيها أو انتهاك سياسات Meta/WhatsApp/Telegram.</li>
+                      <li><strong>الدفع والتفعيل:</strong> يتم الدفع والتفعيل يدوياً للخطف الشهرية عبر وسائل الدفع المعتمدة (CliQ، زين كاش، تحويل بنكي). لا توجد عمليات استرداد بعد تفعيل كود الاشتراك.</li>
+                      <li><strong>إخلاء المسؤولية:</strong> لا نتحمل مسؤولية أي حظر لحسابات التواصل الاجتماعي الخاصة بك نتيجة لمخالفة سياسات المنصات الخارجية أو استخدام نصوص ردود مسيئة.</li>
+                    </ol>
+                  </div>
+                ) : (
+                  <div style={{ lineHeight: 1.8, fontSize: 13, color: 'var(--text-secondary, #9aa0ac)', direction: 'ltr', textAlign: 'left' }}>
+                    <p>Welcome to <strong>AutoFlow Chat</strong>. By using our platform, you agree to the following terms:</p>
+                    <ol style={{ paddingLeft: 20, margin: '10px 0' }}>
+                      <li><strong>Service & Automation:</strong> We provide AI-powered chat and sales automation services. The merchant is solely responsible for reviewing and maintaining the accuracy of responses.</li>
+                      <li><strong>Prohibited Use:</strong> You agree not to use our automation service for spamming, sending unsolicited messages, or violating Meta, WhatsApp, or Telegram policies.</li>
+                      <li><strong>Payment & Activation:</strong> Subscriptions are paid and activated manually using supported methods (CliQ, Zain Cash, Bank transfer). No refunds are provided after activation.</li>
+                      <li><strong>Limitation of Liability:</strong> We are not liable for any account restrictions or bans imposed by social media platforms due to policy violations.</li>
+                    </ol>
+                  </div>
+                )
+              ) : (
+                isArabic ? (
+                  <div style={{ lineHeight: 1.8, fontSize: 13, color: 'var(--text-secondary, #9aa0ac)' }}>
+                    <p>في <strong>AutoFlow Chat</strong>، نلتزم بحماية خصوصية بياناتك وبيانات عملائك:</p>
+                    <ul style={{ paddingRight: 20, margin: '10px 0' }}>
+                      <li><strong>جمع البيانات:</strong> نقوم بجمع بيانات المحادثات والرسائل والعملاء الواردة من قنوات الربط بغرض تشغيل أداة المبيعات والذكاء الاصطناعي فقط.</li>
+                      <li><strong>حفظ البيانات:</strong> يتم تخزين جميع البيانات بشكل آمن على قواعد بيانات Supabase ولا يتم مشاركتها أو بيعها لأي جهة خارجية.</li>
+                      <li><strong>الربط مع Nashir:</strong> نستخدم صلاحيات الربط عبر منصة ناشر لتلقي وإرسال الرسائل فقط، ولا نقوم بتخزين كلمات المرور أو معلومات الدفع الخاصة بك.</li>
+                      <li><strong>حقوق المستخدم:</strong> يحق لك طلب حذف جميع بياناتك ومحادثاتك المخزنة لدينا بشكل نهائي من خلال التواصل مع الدعم الفني.</li>
+                    </ul>
+                  </div>
+                ) : (
+                  <div style={{ lineHeight: 1.8, fontSize: 13, color: 'var(--text-secondary, #9aa0ac)', direction: 'ltr', textAlign: 'left' }}>
+                    <p>At <strong>AutoFlow Chat</strong>, we commit to protecting the privacy of your data and your customers' data:</p>
+                    <ul style={{ paddingLeft: 20, margin: '10px 0' }}>
+                      <li><strong>Data Collection:</strong> We collect chat messages and customer details from connected channels solely to run the AI sales automation.</li>
+                      <li><strong>Data Storage:</strong> All data is securely stored on Supabase databases and is never shared, sold, or distributed to third parties.</li>
+                      <li><strong>Nashir Integration:</strong> We utilize API access through Nashir only to receive and send messages, and we do not store your credentials or payment info.</li>
+                      <li><strong>User Rights:</strong> You have the right to request permanent deletion of all your stored data and chat history at any time by contacting support.</li>
+                    </ul>
+                  </div>
+                )
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
+}
+
+const footerBtnLink = {
+  background: 'none',
+  border: 'none',
+  color: 'var(--text-secondary,#9aa0ac)',
+  cursor: 'pointer',
+  fontSize: '13px',
+  fontFamily: 'Cairo, sans-serif',
+  padding: 0,
+  textDecoration: 'none',
+  transition: 'color 0.2s',
+}
+
+const modalOverlayStyle = {
+  position: 'fixed',
+  inset: 0,
+  background: 'rgba(0,0,0,0.7)',
+  backdropFilter: 'blur(5px)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  zIndex: 10000,
+  padding: 20,
+}
+
+const modalContentStyle = {
+  background: 'var(--bg-card,#1a1d24)',
+  border: '1px solid var(--border-color,#2a2e37)',
+  borderRadius: 16,
+  padding: 24,
+  width: '100%',
+  maxWidth: 550,
+  color: '#fff',
+  fontFamily: 'Cairo, sans-serif',
+  boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
+}
+
+const modalHeaderStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginBottom: 16,
+  paddingBottom: 12,
+  borderBottom: '1px solid var(--border-color,#2a2e37)',
+}
+
+const modalCloseBtnStyle = {
+  background: 'transparent',
+  border: 'none',
+  color: '#9aa0ac',
+  fontSize: 18,
+  cursor: 'pointer',
+}
+
+const modalBodyStyle = {
+  maxHeight: '60vh',
+  overflowY: 'auto',
+  textAlign: 'start',
 }

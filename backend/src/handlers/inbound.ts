@@ -634,30 +634,26 @@ export async function processInbound(userId: string, raw: any, opts?: { skipAI?:
     await supabase.from('conversations').update({ last_message: item.content, last_message_at: new Date().toISOString() }).eq('id', conv.id);
   }
 
+  // IMMEDIATELY insert the customer message to lock it against parallel retries/poller.
+  await supabase.from('messages').insert({
+    user_id: userId, conversation_id: conv!.id, nashir_message_id: item.dedupKey,
+    nashir_reply_id: item.replyId ? String(item.replyId) : null,
+    sender: 'customer', content: item.content, message_type: item.isComment ? 'comment' : 'dm',
+    raw_payload: raw,
+  });
+
   // skipAI mode (poller backlog): store the message so it shows in the inbox, notify the
   // UI, but never generate or send a reply — replying hours late confuses customers.
   if (opts?.skipAI) {
-    await supabase.from('messages').insert({
-      user_id: userId, conversation_id: conv!.id, nashir_message_id: item.dedupKey,
-      nashir_reply_id: item.replyId ? String(item.replyId) : null,
-      sender: 'customer', content: item.content, message_type: item.isComment ? 'comment' : 'dm',
-      raw_payload: raw,
-    });
     emit(userId, `${item.base}:message`, { convId: conv!.id, platform: item.platform });
     return '';
   }
 
   // ---- Complaint detection (runs BEFORE AI to short-circuit) ----
   if (looksLikeComplaint(item.content) && !isAIPaused(conv)) {
-    // Insert the customer's message
-    if (!exists) {
-      await supabase.from('messages').insert({
-        user_id: userId, conversation_id: conv!.id, nashir_message_id: item.dedupKey,
-        nashir_reply_id: item.replyId ? String(item.replyId) : null,
-        sender: 'customer', content: item.content, message_type: item.isComment ? 'comment' : 'dm', ai_suggestion: COMPLAINT_REPLY,
-        raw_payload: raw,
-      });
-    }
+    // Update the customer's message with the complaint suggestion
+    await supabase.from('messages').update({ ai_suggestion: COMPLAINT_REPLY })
+      .eq('user_id', userId).eq('nashir_message_id', item.dedupKey);
     // Pause AI for 2h on this conv
     await pauseConversationAI(conv!.id, PAUSE_HOURS_COMPLAINT);
     // Create complaint notification (DB + telegram)
@@ -689,14 +685,6 @@ export async function processInbound(userId: string, raw: any, opts?: { skipAI?:
 
   // ---- AI pause check: skip AI if conversation is paused (manual takeover or complaint) ----
   if (isAIPaused(conv)) {
-    if (!exists) {
-      await supabase.from('messages').insert({
-        user_id: userId, conversation_id: conv!.id, nashir_message_id: item.dedupKey,
-        nashir_reply_id: item.replyId ? String(item.replyId) : null,
-        sender: 'customer', content: item.content, message_type: item.isComment ? 'comment' : 'dm',
-        raw_payload: raw,
-      });
-    }
     emit(userId, `${item.base}:message`, { convId: conv!.id, platform: item.platform });
     return '';
   }
@@ -791,14 +779,9 @@ export async function processInbound(userId: string, raw: any, opts?: { skipAI?:
     console.error('[inbound AI ERROR]', e?.response?.status, JSON.stringify(e?.response?.data || e?.message).slice(0, 500), 'stack:', e?.stack?.slice(0, 300));
   }
 
-  if (!exists) {
-    await supabase.from('messages').insert({
-      user_id: userId, conversation_id: conv!.id, nashir_message_id: item.dedupKey,
-      nashir_reply_id: item.replyId ? String(item.replyId) : null,
-      sender: 'customer', content: item.content, message_type: item.isComment ? 'comment' : 'dm', ai_suggestion: reply,
-      raw_payload: raw,
-    });
-  }
+  // Update the customer's message with the AI reply suggestion
+  await supabase.from('messages').update({ ai_suggestion: reply })
+    .eq('user_id', userId).eq('nashir_message_id', item.dedupKey);
   emit(userId, `${item.base}:message`, { convId: conv!.id, platform: item.platform });
 
   // Auto-send the reply to the platform via Nashir REST (the actual delivery path).
