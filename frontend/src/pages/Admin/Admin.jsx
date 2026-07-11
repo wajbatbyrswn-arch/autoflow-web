@@ -51,7 +51,10 @@ export default function Admin() {
 
   return (
     <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 24 }}>
-      <h1 style={{ fontSize: 24, fontWeight: 800 }}>{t('لوحة الإدارة')}</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <h1 style={{ fontSize: 24, fontWeight: 800 }}>{t('لوحة الإدارة')}</h1>
+        <button onClick={() => toast.success('تم تشغيل الاختبار بنجاح! 🚀')} style={{ ...btn, background: '#22c55e' }}>Test 🚀</button>
+      </div>
 
       <section style={card}>
         <h2 style={h2}>{t('توليد أكواد التفعيل')}</h2>
