@@ -40,7 +40,7 @@
 .tag-grey  { background: rgba(148,163,184,0.18); color: #cbd5e1; }
 
 /* ===== Automations grid ===== */
-.automations-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 14px; }
+.automations-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
 .auto-card { padding: 18px; background: var(--bg-card, #1a1d24); border: 1px solid var(--border-color, #2a2e37); border-radius: 14px; display: flex; flex-direction: column; gap: 10px; }
 .auto-card.off { opacity: 0.55; }
 .auto-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -76,6 +76,21 @@
 .ca-modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 10px; padding-top: 16px; border-top: 1px solid var(--border-color, #2a2e37); }
 
 /* Backward-compat with old class names */
-.campaigns-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+.campaigns-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
 .camp-card { transition: var(--transition); }
 .camp-card.inactive { opacity: 0.5; }
+
+/* ── Mobile & Tablet Responsiveness ── */
+@media (max-width: 600px) {
+  .ca-page {
+    padding: 12px;
+  }
+  .setting-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .switch {
+    align-self: flex-end;
+  }
+}

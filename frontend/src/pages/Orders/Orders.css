@@ -43,3 +43,14 @@
 .status-select.status-shipped { border-color:#8b5cf6; color:#a78bfa; }
 .status-select.status-delivered { border-color:#10b981; color:#34d399; }
 .status-select.status-cancelled { border-color:#ef4444; color:#f87171; }
+
+/* ── Mobile & Tablet Responsiveness ── */
+@media (max-width: 900px) {
+  .orders-layout {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .order-detail {
+    position: static; /* Disable sticky detail block on mobile so it flows below the list */
+  }
+}

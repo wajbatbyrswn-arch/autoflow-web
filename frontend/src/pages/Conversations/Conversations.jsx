@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
+import { ArrowRight } from 'lucide-react'
 import { useT } from '../../lib/i18n'
 import './Conversations.css'
 
@@ -159,7 +160,7 @@ export default function Conversations() {
   const platformColor = selected ? PLATFORM_COLORS[selected.platform] : null
 
   return (
-    <div className="conv-layout animate-fade">
+    <div className={`conv-layout animate-fade ${selected ? 'has-selection' : ''}`}>
       {/* Left panel */}
       <div className="conv-list-panel">
         <div className="conv-list-header">
@@ -238,6 +239,24 @@ export default function Conversations() {
             {/* Chat header */}
             <div className="chat-header" style={{borderBottom: `2px solid ${platformColor}22`}}>
               <div className="flex items-center gap-3">
+                <button
+                  className="mobile-back-btn"
+                  onClick={() => setSelected(null)}
+                  title={t('رجوع')}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--text-primary)',
+                    cursor: 'pointer',
+                    display: 'none',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '8px',
+                    marginLeft: '8px'
+                  }}
+                >
+                  <ArrowRight size={20} />
+                </button>
                 <div className="chat-avatar" style={{background: `${platformColor}22`, border:`1px solid ${platformColor}44`}}>
                   <img src={PLATFORM_ICONS[selected.platform]} alt={selected.platform} className="chat-header-img" />
                 </div>

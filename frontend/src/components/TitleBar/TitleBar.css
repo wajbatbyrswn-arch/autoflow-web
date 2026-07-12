@@ -192,3 +192,26 @@
   color: #000;
 }
 
+/* ── Mobile & Tablet Responsiveness ── */
+@media (max-width: 768px) {
+  .titlebar {
+    padding: 0 12px;
+  }
+  .datetime-display {
+    display: none !important; /* Hide datetime display on mobile to avoid overflow */
+  }
+  .header-right-content {
+    gap: 12px;
+  }
+  .header-actions {
+    gap: 8px;
+  }
+  .page-title {
+    font-size: 16px;
+  }
+  .sun-icon, .moon-icon {
+    width: 16px;
+    height: 16px;
+  }
+}
+

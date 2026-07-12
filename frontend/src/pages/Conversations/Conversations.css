@@ -304,3 +304,29 @@
   height: 16px;
   object-fit: contain;
 }
+
+/* ── Mobile & Tablet Responsiveness ── */
+@media (max-width: 768px) {
+  .conv-layout {
+    grid-template-columns: 1fr;
+    height: calc(100vh - var(--titlebar-h) - 16px);
+    margin: -12px;
+  }
+  .conv-list-panel {
+    display: flex;
+    width: 100%;
+  }
+  .chat-panel {
+    display: none;
+    width: 100%;
+  }
+  .conv-layout.has-selection .conv-list-panel {
+    display: none;
+  }
+  .conv-layout.has-selection .chat-panel {
+    display: flex;
+  }
+  .mobile-back-btn {
+    display: inline-flex !important;
+  }
+}

@@ -236,3 +236,11 @@
 .btn-ghost:hover { color: var(--text-primary); border-color: var(--border-color); }
 
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Mobile & Tablet Responsiveness ── */
+@media (max-width: 768px) {
+  .ai-layout {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}

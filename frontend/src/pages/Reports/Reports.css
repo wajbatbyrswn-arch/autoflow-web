@@ -70,3 +70,23 @@
 .prod-progress-bg { height: 8px; border-radius: 999px; background: var(--glass-bg, rgba(255,255,255,0.05)); overflow: hidden; }
 .prod-progress-fill { height: 100%; border-radius: 999px; transition: width .4s ease; }
 .prod-count { font-size: 11px; opacity: .7; min-width: 60px; text-align: left; }
+
+/* ── Mobile & Tablet Responsiveness ── */
+@media (max-width: 500px) {
+  .reports-pro {
+    padding: 12px;
+  }
+  .prod-row {
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+  }
+  .prod-progress-bg {
+    display: none; /* Hide progress bar on tiny mobile screens to save space */
+  }
+}
+
+@media (max-width: 480px) {
+  .kpi-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
