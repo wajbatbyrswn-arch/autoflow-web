@@ -401,8 +401,8 @@ ${productLines || 'لا توجد منتجات'}
         <div className="animate-fade">
           <input ref={excelInputRef} type="file" accept=".xlsx,.xls,.csv" style={{display:'none'}} onChange={onImportExcel} />
           <input ref={imgInputRef} type="file" accept="image/*" style={{display:'none'}} onChange={onPickImage} />
-          <div className="flex justify-between items-center mb-4">
-            <div className="flex gap-2">
+          <div className="flex justify-between items-center mb-4 products-header-row">
+            <div className="flex gap-2 products-actions">
               <button className="btn btn-primary btn-sm flex-center" onClick={() => setEditing(emptyProduct)}>
                 <img src={addIcon} className="btn-img-icon" /> {t('منتج جديد')}
               </button>
@@ -571,16 +571,16 @@ ${productLines || 'لا توجد منتجات'}
       )}
 
       {/* Shortcut to Platform Settings */}
-      <div className="card animate-fade" style={{marginTop:16,background:'linear-gradient(135deg,rgba(99,102,241,0.08),rgba(99,102,241,0.02))',border:'1px solid rgba(99,102,241,0.2)'}}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+      <div className="card animate-fade shortcut-settings-card" style={{marginTop:16,background:'linear-gradient(135deg,rgba(99,102,241,0.08),rgba(99,102,241,0.02))',border:'1px solid rgba(99,102,241,0.2)'}}>
+        <div className="flex items-center justify-between shortcut-settings-inner">
+          <div className="flex items-center gap-3 shortcut-settings-info">
             <img src={settingsIcon} style={{width:28,height:28,opacity:0.85}} alt="settings" />
             <div>
               <div style={{fontWeight:600,fontSize:14}}>{t('ربط وسائل التواصل الاجتماعي')}</div>
               <div style={{fontSize:12,color:'var(--text-muted)'}}>{t('لربط واتساب وتلغرام وفيسبوك وإنستغرام، اذهب إلى صفحة الإعدادات ← المنصات')}</div>
             </div>
           </div>
-          <button className="btn btn-primary btn-sm" onClick={() => navigate('/settings')}>{t('فتح الإعدادات')}</button>
+          <button className="btn btn-primary btn-sm shortcut-settings-btn" onClick={() => navigate('/settings')}>{t('فتح الإعدادات')}</button>
         </div>
       </div>
     </div>

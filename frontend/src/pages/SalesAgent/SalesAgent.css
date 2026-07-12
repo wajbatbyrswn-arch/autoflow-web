@@ -100,3 +100,79 @@
   background: var(--bg-input);
 }
 
+/* ── Mobile & Tablet Responsiveness ── */
+@media (max-width: 768px) {
+  /* Tabs: scroll horizontally instead of overlapping */
+  .tabs {
+    overflow-x: auto;
+    max-width: 100%;
+    padding: 4px;
+    gap: 4px;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+  .tabs::-webkit-scrollbar {
+    display: none;
+  }
+  .tab {
+    padding: 8px 14px;
+    font-size: 12px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .tab-img-icon {
+    width: 16px;
+    height: 16px;
+  }
+
+  /* Table: prevent table from squeezing columns + set min-width for horizontal scrolling */
+  .table-wrap table {
+    min-width: 750px;
+  }
+  .table-wrap table th:nth-child(2),
+  .table-wrap table td:nth-child(2) {
+    min-width: 220px; /* Give product name column enough room to wrap naturally */
+    white-space: normal;
+  }
+
+  /* Products Tab buttons */
+  .products-header-row {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 12px;
+  }
+  .products-actions {
+    flex-wrap: wrap;
+    justify-content: center;
+    width: 100%;
+  }
+  .products-actions button {
+    flex: 1;
+    min-width: 130px;
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+  
+  /* Select Dropdowns alignment on mobile */
+  .select {
+    padding-left: 32px; /* make sure chevrons don't overlap Arabic text */
+  }
+}
+
+@media (max-width: 600px) {
+  .shortcut-settings-inner {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 16px;
+    text-align: center;
+  }
+  .shortcut-settings-info {
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .shortcut-settings-btn {
+    width: 100%;
+  }
+}
+

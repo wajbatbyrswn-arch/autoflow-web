@@ -432,3 +432,38 @@ input:checked + .toggle-slider::before { transform: translateX(-22px); backgroun
   .sidebar-overlay.open { display: block; }
 }
 
+/* ── Notifications Responsiveness ── */
+.notif-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.notif-filters {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  width: 100%;
+}
+.notif-filters::-webkit-scrollbar {
+  display: none;
+}
+.notif-filters button {
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .notif-header {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 12px;
+  }
+  .notif-header button {
+    width: 100%;
+  }
+}
+

@@ -59,7 +59,7 @@ export default function Notifications() {
 
   return (
     <div className="animate-fade" style={{ padding: 24 }}>
-      <div className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+      <div className="page-header notif-header" style={{ marginBottom: 16 }}>
         <div>
           <h1 style={{ display:'flex', alignItems:'center', gap:10 }}><Bell size={26}/> {t('الإشعارات')}</h1>
           <p>{t('كل ما يحدث في متجرك في مكان واحد، مع إشعارات فورية على تلغرام.')}</p>
@@ -67,7 +67,7 @@ export default function Notifications() {
         <button className="btn btn-secondary" onClick={markAll}>{t('وضع علامة مقروء على الكل')}</button>
       </div>
 
-      <div style={{ display:'flex', gap:8, marginBottom:16, flexWrap:'wrap' }}>
+      <div className="notif-filters" style={{ marginBottom:16 }}>
         {FILTERS.map(f => (
           <button key={f.v} onClick={() => setFilter(f.v)}
             style={{
