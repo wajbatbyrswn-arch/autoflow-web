@@ -20,7 +20,55 @@ import { stubHandlers } from './handlers/stubs';
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors({ origin: true, credentials: true }));
+// CORS Hardening: Only allow development hosts and production domain (plus any Vercel deploys)
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  process.env.FRONTEND_URL || 'https://autoflowchat.shop'
+].filter(Boolean) as string[];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+}));
+
+// Basic Security Headers (Helmet simulation)
+app.use((_req, res, next) => {
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
+
+// Custom In-Memory Rate Limiter to prevent DDoS/Scraping
+const ipCache = new Map<string, { count: number; resetTime: number }>();
+const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
+
+function rateLimiter(maxRequests: number) {
+  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const ip = req.headers['x-forwarded-for'] as string || req.socket.remoteAddress || 'unknown';
+    const now = Date.now();
+    const cached = ipCache.get(ip);
+
+    if (!cached || now > cached.resetTime) {
+      ipCache.set(ip, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
+      return next();
+    }
+
+    cached.count++;
+    if (cached.count > maxRequests) {
+      return res.status(429).json({ error: 'Too many requests. Please try again later.' });
+    }
+    next();
+  };
+}
+
 
 // Webhook route: accept ANY content-type (text/plain, missing header, form-encoded...).
 // Nashir/proxies may not send application/json — express.json() alone would leave
@@ -80,7 +128,7 @@ function pushTrace(entry: typeof WEBHOOK_TRACE[number]) {
 
 // Public trace endpoint: pass the same webhook token to see the last 30 calls that hit it.
 // Safe because token is a per-user secret UUID.
-app.get('/api/nashir/webhook-trace/:token', async (req, res) => {
+app.get('/api/nashir/webhook-trace/:token', rateLimiter(60), async (req, res) => {
   const token = req.params.token;
   const { data: user } = await supabase
     .from('user_profiles').select('user_id').eq('nashir_webhook_token', token).single();
@@ -91,7 +139,7 @@ app.get('/api/nashir/webhook-trace/:token', async (req, res) => {
 
 // Per-user Nashir webhook: paste this URL (with the user's token) into Nashir's workflow.
 // Public endpoint — identified by the secret token in the path.
-app.all('/api/nashir/webhook/:token', async (req, res) => {
+app.all('/api/nashir/webhook/:token', rateLimiter(500), async (req, res) => {
   const token = req.params.token;
   const trace = {
     at: new Date().toISOString(),
@@ -131,7 +179,7 @@ app.all('/api/nashir/webhook/:token', async (req, res) => {
 });
 
 // Single RPC endpoint: { channel, payload } -> { result }
-app.post('/api/rpc', async (req, res) => {
+app.post('/api/rpc', rateLimiter(150), async (req, res) => {
   const userId = await verifyToken(getBearer(req.headers.authorization) || '');
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
   const { channel, payload } = req.body || {};
@@ -145,7 +193,7 @@ app.post('/api/rpc', async (req, res) => {
 });
 
 // SSE event stream (token passed as query param since EventSource can't set headers).
-app.get('/api/events', async (req, res) => {
+app.get('/api/events', rateLimiter(60), async (req, res) => {
   const userId = await verifyToken(String(req.query.token || ''));
   if (!userId) return res.status(401).end();
   res.writeHead(200, {
